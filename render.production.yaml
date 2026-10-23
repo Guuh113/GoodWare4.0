@@ -1,0 +1,38 @@
+services:
+  - type: web
+    name: goodware-app
+    runtime: docker
+    plan: 0.5c-512mb
+    autoDeployTrigger: 'off'
+    healthCheckPath: /healthz
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DATABASE_URL
+        fromDatabase:
+          name: goodware-db
+          property: connectionString
+      - key: COOKIE_SECURE
+        value: '1'
+      - key: TRUST_PROXY
+        value: '1'
+      - key: LLM_BASE_URL
+        sync: false
+      - key: LLM_MODEL
+        sync: false
+      - key: LLM_API_KEY
+        sync: false
+      - key: PUBLIC_BASE_URL
+        sync: false
+      - key: ALLOW_REGISTRATION
+        value: '1'
+      - key: WEB_CONCURRENCY
+        value: '1'
+databases:
+  - name: goodware-db
+    postgresMajorVersion: "17"
+    databaseName: goodware
+    user: goodware
+    ipAllowList: []

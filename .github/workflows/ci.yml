@@ -1,0 +1,49 @@
+name: GoodWare checks
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: goodware_test
+          POSTGRES_USER: goodware
+          POSTGRES_PASSWORD: test-only-password
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U goodware -d goodware_test"
+          --health-interval 5s --health-timeout 5s --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: pip install -r requirements.txt
+      - run: python -m pytest -q
+      - run: node --test tests/*.cjs
+      - run: python -m pytest -q tests/test_postgres.py
+        env:
+          TEST_POSTGRES_URL: postgresql+psycopg://goodware:test-only-password@localhost:5432/goodware_test
+      - run: docker build -t goodware:ci .
+  deploy:
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+    needs: tests
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Trigger approved deployment
+        env:
+          RENDER_DEPLOY_HOOK: ${{ secrets.RENDER_DEPLOY_HOOK }}
+        run: |
+          test -n "$RENDER_DEPLOY_HOOK" || { echo 'Configure RENDER_DEPLOY_HOOK no ambiente production.'; exit 1; }
+          curl --fail --silent --show-error --request POST "$RENDER_DEPLOY_HOOK" > /dev/null

@@ -1,0 +1,63 @@
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: goodware
+      POSTGRES_USER: goodware
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Defina POSTGRES_PASSWORD no .env}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U goodware -d goodware']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+  app:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      PORT: '8000'
+      DATABASE_URL: postgresql+psycopg://goodware:${POSTGRES_PASSWORD}@db:5432/goodware
+      APP_ENV: production
+      COOKIE_SECURE: '1'
+      TRUST_PROXY: '1'
+    depends_on:
+      db:
+        condition: service_healthy
+    expose: ['8000']
+    mem_limit: 1g
+    cpus: 1.0
+    security_opt: ['no-new-privileges:true']
+  proxy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    environment:
+      GOODWARE_DOMAIN: ${GOODWARE_DOMAIN:?Defina seu dominio no .env}
+    ports: ['80:80', '443:443']
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddydata:/data
+      - caddyconfig:/config
+    depends_on: [app]
+  backup:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      PGHOST: db
+      PGUSER: goodware
+      PGDATABASE: goodware
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - ./ops/backup.sh:/backup.sh:ro
+      - backups:/backups
+    entrypoint: ['/bin/sh', '/backup.sh']
+    depends_on:
+      db:
+        condition: service_healthy
+volumes:
+  pgdata:
+  caddydata:
+  caddyconfig:
+  backups:

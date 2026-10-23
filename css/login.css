@@ -1,0 +1,169 @@
+/* ============================================================
+   GOODWARE — Tela de Login
+   ============================================================ */
+
+.login-shell {
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: 1.1fr 1fr;
+}
+
+/* ---------- Painel esquerdo: contexto da marca ---------- */
+
+.login-context {
+  position: relative;
+  background: var(--panel);
+  border-right: 1px solid var(--border);
+  padding: var(--space-8) var(--space-7);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  overflow: hidden;
+}
+
+.login-context-top {
+  position: relative;
+  z-index: 1;
+}
+
+.login-context h1 {
+  margin-top: var(--space-6);
+  max-width: 14ch;
+  text-transform: uppercase;
+}
+
+.login-context p {
+  margin-top: var(--space-3);
+  max-width: 34ch;
+  color: var(--text-muted);
+  font-size: 0.9375rem;
+}
+
+.login-principles {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.login-principles li {
+  list-style: none;
+  display: flex;
+  gap: var(--space-3);
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+}
+
+.login-principles li svg {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--accent);
+}
+
+/* ---------- Visual ambiente (glow + esquema de arquivo escaneado) ---------- */
+
+.scan-graphic-wrap {
+  position: absolute;
+  inset: 0;
+}
+
+.scan-graphic-wrap svg {
+  width: 100%;
+  height: 100%;
+}
+
+.ambient-glow {
+  animation: ambient-drift 6s ease-in-out infinite;
+  transform-origin: center;
+}
+
+.scan-line {
+  animation: scan-pulse 4.5s ease-in-out infinite;
+}
+
+@keyframes ambient-drift {
+  0%, 100% { transform: translate(0, 0); opacity: 0.18; }
+  50%      { transform: translate(4px, -16px); opacity: 0.5; }
+}
+
+@keyframes scan-pulse {
+  0%, 100% { transform: translateY(0); opacity: 0.25; }
+  50%      { transform: translateY(14px); opacity: 0.9; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scan-line, .ambient-glow { animation: none; }
+}
+
+/* ---------- Painel direito: formulário ---------- */
+
+.login-form-panel {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-6);
+}
+
+.login-form-inner {
+  width: 100%;
+  max-width: 360px;
+}
+
+.login-form-inner > .brand-mark {
+  margin-bottom: var(--space-7);
+}
+
+.login-form-inner h2 {
+  margin-bottom: var(--space-1);
+}
+
+.login-form-inner .text-muted {
+  display: block;
+  margin-bottom: var(--space-6);
+  font-size: 0.875rem;
+}
+
+.form-banner {
+  display: none;
+  align-items: flex-start;
+  gap: var(--space-2);
+  background: var(--error-dim);
+  border: 1px solid rgba(255, 107, 120, 0.35);
+  color: var(--error);
+  font-size: 0.8125rem;
+  padding: var(--space-3);
+  border-radius: var(--radius-sm);
+  margin-bottom: var(--space-5);
+}
+
+.form-banner.is-visible {
+  display: flex;
+}
+
+.login-footer-link {
+  margin-top: var(--space-6);
+  text-align: center;
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+}
+
+.login-footer-link a {
+  color: var(--accent);
+  text-decoration: none;
+  font-weight: 500;
+}
+
+.login-footer-link a:hover {
+  color: var(--accent-strong);
+  text-decoration: underline;
+}
+
+@media (max-width: 860px) {
+  .login-shell {
+    grid-template-columns: 1fr;
+  }
+  .login-context {
+    display: none;
+  }
+}

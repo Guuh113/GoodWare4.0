@@ -1,0 +1,37 @@
+.env
+instance/
+__pycache__/
+.pytest_cache/
+.venv/
+
+backups/
+*.dump
+.env.*
+!.env.example
+# Senhas e chaves privadas
+.env
+.env.*
+!.env.example
+
+# Ambiente virtual Python
+.venv/
+venv/
+__pycache__/
+*.pyc
+
+# Banco de dados
+instance/
+*.db
+*.sqlite
+*.sqlite3
+
+# Arquivos temporários
+*.log
+*.tmp
+.cache/
+.pytest_cache/
+
+# Arquivos privados
+uploads/
+quarantine/
+*.key

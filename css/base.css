@@ -1,0 +1,362 @@
+/* ============================================================
+   GOODWARE — Design System Base
+   Direção: dark + technical + editorial + subtle motion
+   (inspirado na linguagem visual de produtos developer-first)
+   ============================================================ */
+
+:root {
+  /* Paleta — preto profundo, roxo como identidade, acentos de status */
+  --bg: #0B0B0D;
+  --panel: #101014;       /* surface: cards, inputs, linhas de lista */
+  --panel-alt: #15151B;   /* panel: topbar, menus, cabeçalho de tabela */
+  --border: #232329;
+  --border-soft: #1A1A1F;
+
+  --text: #F2F2F5;
+  --text-muted: #9A99A6;
+  --text-faint: #5C5B66;
+
+  --accent: #7B61FF;              /* primary */
+  --accent-strong: #9B87FF;       /* primary light — hover/ênfase */
+  --accent-dim: rgba(123, 97, 255, 0.14);
+
+  --info: #5CC8FF;
+  --info-dim: rgba(92, 200, 255, 0.12);
+  --success: #55D48A;
+  --success-dim: rgba(85, 212, 138, 0.12);
+  --error: #FF6B78;
+  --error-dim: rgba(255, 107, 120, 0.12);
+
+  /* Severidade — reaproveita a paleta de status (sem cores extras) */
+  --critical: var(--error);
+  --critical-dim: var(--error-dim);
+  --high: #FF97A1;                 /* tom mais claro, mesma família do erro */
+  --high-dim: rgba(255, 151, 161, 0.12);
+  --medium: var(--info);
+  --medium-dim: var(--info-dim);
+  --low: var(--text-muted);
+  --low-dim: rgba(154, 153, 166, 0.12);
+  --ok: var(--success);
+  --ok-dim: var(--success-dim);
+
+  /* Tipografia — contraste entre headline, interface e código */
+  --font-sans: 'Space Grotesk', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', 'SFMono-Regular', Consolas, monospace;
+
+  /* Espaçamento */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --space-8: 64px;
+
+  --radius-sm: 4px;
+  --radius-md: 6px;
+
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3, p, ul, figure {
+  margin: 0;
+}
+
+a {
+  color: inherit;
+}
+
+button {
+  font-family: inherit;
+}
+
+img, svg {
+  display: block;
+  max-width: 100%;
+}
+
+::selection {
+  background: var(--accent-dim);
+  color: var(--text);
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* ---------- Tipografia ---------- */
+/* Escala: H1 34px / H2 20px / Body 13-14px / Meta 11px */
+
+h1 {
+  font-size: 2.125rem;      /* 34px */
+  font-weight: 700;
+  line-height: 1.12;
+  letter-spacing: -0.01em;
+}
+
+h2 {
+  font-size: 1.25rem;       /* 20px */
+  font-weight: 600;
+  letter-spacing: -0.005em;
+}
+
+.text-muted {
+  color: var(--text-muted);
+}
+
+.mono {
+  font-family: var(--font-mono);
+}
+
+/* ---------- Marca ---------- */
+
+.brand-mark {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-family: var(--font-mono);
+  font-weight: 500;
+  font-size: 0.9375rem;
+  color: var(--text);
+  text-decoration: none;
+}
+
+.brand-mark svg {
+  flex-shrink: 0;
+}
+
+/* ---------- Botões ---------- */
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: 0.6875rem var(--space-4);
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+  font-family: var(--font-sans);
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  text-decoration: none; /* .btn também é usado em <a> */
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-primary {
+  background: var(--accent);
+  color: #0B0B0D;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: var(--accent-strong);
+}
+
+.btn-secondary {
+  background: var(--panel);
+  border-color: var(--border);
+  color: var(--text);
+}
+
+.btn-secondary:hover:not(:disabled) {
+  border-color: var(--text-faint);
+  background: var(--panel-alt);
+}
+
+.btn-block {
+  width: 100%;
+}
+
+.btn-spinner {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid rgba(11, 11, 13, 0.35);
+  border-top-color: #0B0B0D;
+  animation: spin 0.7s linear infinite;
+  display: none;
+}
+
+.btn.is-loading .btn-spinner {
+  display: inline-block;
+}
+
+.btn.is-loading .btn-label {
+  opacity: 0.85;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.btn-divider {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin: var(--space-4) 0;
+  color: var(--text-faint);
+  font-size: 0.75rem;
+}
+
+.btn-divider::before,
+.btn-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+/* ---------- Campos de formulário ---------- */
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+}
+
+.field label {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.field-control {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.field input[type="email"],
+.field input[type="password"],
+.field input[type="text"] {
+  width: 100%;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-family: inherit;
+  font-size: 0.9375rem;
+  padding: 0.6875rem var(--space-3);
+  border-radius: var(--radius-sm);
+  transition: border-color 0.15s ease;
+}
+
+.field input::placeholder {
+  color: var(--text-faint);
+}
+
+.field input:focus {
+  border-color: var(--accent);
+}
+
+.field input.has-error {
+  border-color: var(--error);
+}
+
+.field-error {
+  font-size: 0.8125rem;
+  color: var(--error);
+  display: none;
+}
+
+.field.is-invalid .field-error {
+  display: block;
+}
+
+.field-toggle {
+  position: absolute;
+  right: var(--space-2);
+  background: none;
+  border: none;
+  color: var(--text-faint);
+  cursor: pointer;
+  padding: var(--space-1);
+  display: flex;
+}
+
+.field-toggle:hover {
+  color: var(--text-muted);
+}
+
+.checkbox-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.8125rem;
+  margin-bottom: var(--space-5);
+}
+
+.checkbox-row label {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.checkbox-row a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.checkbox-row a:hover {
+  color: var(--accent-strong);
+  text-decoration: underline;
+}
+
+/* ---------- Badges de severidade / status ---------- */
+/* Rótulo curto em mono + versalete, como estados de sistema (ERROR, LIVE) */
+
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 0.1875rem var(--space-2);
+  border-radius: var(--radius-sm);
+  white-space: nowrap;
+}
+
+.badge::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.badge-critical { background: var(--critical-dim); color: var(--critical); }
+.badge-high     { background: var(--high-dim); color: var(--high); }
+.badge-medium   { background: var(--medium-dim); color: var(--medium); }
+.badge-low      { background: var(--low-dim); color: var(--low); }
+.badge-ok       { background: var(--ok-dim); color: var(--ok); }
+.badge-neutral  { background: var(--panel-alt); color: var(--text-muted); }

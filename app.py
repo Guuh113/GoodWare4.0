@@ -381,6 +381,9 @@ def create_app(test_config=None):
         explicit={r['id'] for r in reports}
         reports=[r for r in remembered if r['id'] not in explicit]+reports
         docs=knowledge.retrieve(db(),message)
+        # Perfil é consultado apenas para personalizar a conversa do próprio usuário.
+        user_profile=db().execute('SELECT full_name,username FROM users WHERE id=?',(session['user'],)).fetchone()
+        profile_name=(user_profile['full_name'] or user_profile['username'] or '') if user_profile else ''
         # Atomic lease prevents simultaneous generations from reordering a conversation.
         now=time.time()
         leased=db().execute('UPDATE conversations SET busy_until=? WHERE id=? AND owner=? AND busy_until<?',(now+180,cid,session['user'],now)).rowcount
@@ -393,7 +396,7 @@ def create_app(test_config=None):
                 try:
                     # Compatibilidade com modelos locais: evita depender do streaming do provedor.
                     # Mantem o protocolo NDJSON esperado pelo frontend do GoodWare.
-                    answer=generate(hist,reports,message,knowledge_docs=docs,previous=previous,stream=False)
+                    answer=generate(hist,reports,message,knowledge_docs=docs,previous=previous,user_name=profile_name,stream=False)
                     if not isinstance(answer,str) or not answer.strip():
                         raise AssistantUnavailable('A IA retornou uma resposta vazia. Verifique o Ollama.')
                     yield packet('delta',text=answer)
@@ -413,7 +416,7 @@ def create_app(test_config=None):
                     db().execute('UPDATE conversations SET busy_until=0 WHERE id=?',(cid,));db().commit()
             return app.response_class(events(),mimetype='application/x-ndjson',headers={'X-Accel-Buffering':'no'})
         try:
-            answer=generate(hist,reports,message,knowledge_docs=docs,previous=previous)
+            answer=generate(hist,reports,message,knowledge_docs=docs,previous=previous,user_name=profile_name)
             # Recheck authorization after external generation: a conversation/account may have been deleted.
             if not valid_session() or not owned(cid):return jsonify(erro='Conversa indisponível.'),404
             db().executemany('INSERT INTO messages(conversation,role,content) VALUES(?,?,?)',[(cid,'user',message),(cid,'assistant',answer)])

@@ -42,9 +42,36 @@ window.GW = {
     const d=await this.requestJSON(url,opts);
     if(d.csrf)this.csrf=d.csrf;return d;
   },
+  riskIndicator(report) {
+    // Indicador categórico: NÃO é chance estatística de malware.
+    const normalized=String(report.risco||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
+    const risk=normalized.includes('critico')||normalized.includes('alto')?'high':
+      normalized.includes('medio')||normalized.includes('moderado')?'attention':
+      normalized.includes('baixo')?'low':'unknown';
+    const labels={
+      high:['Perigo — alto risco','Há indícios importantes: não execute sem investigar.',85],
+      attention:['Atenção — investigar','Padrões suspeitos exigem uma verificação adicional.',50],
+      low:['Baixo risco estimado','A análise não encontrou indícios de alto risco; não é garantia de segurança.',15],
+      unknown:['Risco indeterminado','Os dados disponíveis não permitem classificar o risco.',0]
+    };
+    const [label,description,position]=labels[risk];
+    const outer=this.el('div',undefined,'gw-risk-panel gw-risk-'+risk);
+    const heading=this.el('div',undefined,'gw-risk-heading');
+    const dot=this.el('span',undefined,'gw-risk-dot');dot.setAttribute('aria-hidden','true');
+    heading.append(dot,this.el('strong',label));
+    outer.append(heading,this.el('p',description));
+    const meter=this.el('div',undefined,'gw-risk-meter');
+    meter.setAttribute('role','img');
+    meter.setAttribute('aria-label','Medidor visual categórico: '+label);
+    const pointer=this.el('span',undefined,'gw-risk-pointer');
+    pointer.style.left=position+'%';meter.append(pointer);outer.append(meter);
+    outer.append(this.el('small','Medidor visual da categoria heurística, não probabilidade de infecção.'));
+    return outer;
+  },
   report(r) {
     const box=this.el('section',undefined,'report-card');box.append(this.el('h3',r.alvo));
-    box.append(this.el('p',`${r.classificacao} · Risco: ${r.risco}`));
+    box.append(this.el('p',r.classificacao));
+    box.append(this.riskIndicator(r));
     for(const key of ['tipo_ameaca','explicacao','confianca','impacto','recomendacao'])if(r[key])box.append(this.el('p',r[key]));
     if(r.sha256)box.append(this.el('p','SHA-256: '+r.sha256));
     box.append(this.el('p','Pontuação do modelo (não calibrada): '+(r.pontuacao_modelo==null?'indisponível':r.pontuacao_modelo+' / 100')));

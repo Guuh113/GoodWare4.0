@@ -6,7 +6,7 @@ from pathlib import Path
 from sqlalchemy import (create_engine, MetaData, Table, Column, Text, Integer, Float, ForeignKey, inspect, text, event)
 
 meta=MetaData()
-users=Table('users',meta,Column('id',Text,primary_key=True),Column('email',Text,unique=True),Column('password',Text),Column('full_name',Text,server_default=''),Column('username',Text,server_default=''),Column('memory_enabled',Integer,server_default='0'),Column('verified',Integer,server_default='0'),Column('is_admin',Integer,server_default='0'))
+users=Table('users',meta,Column('id',Text,primary_key=True),Column('email',Text,unique=True),Column('password',Text),Column('full_name',Text,server_default=''),Column('username',Text,server_default=''),Column('memory_enabled',Integer,server_default='0'),Column('verified',Integer,server_default='0'),Column('is_admin',Integer,server_default='0'),Column('mfa_secret',Text,server_default=''),Column('mfa_pending',Text,server_default=''),Column('mfa_pending_until',Float,server_default='0'),Column('mfa_counter',Integer,server_default='-1'),Column('mfa_backups',Text,server_default='[]'))
 Table('conversations',meta,Column('id',Text,primary_key=True),Column('owner',Text,ForeignKey('users.id',ondelete='CASCADE'),index=True),Column('created',Float),Column('title',Text,server_default='Nova conversa'),Column('busy_until',Float,server_default='0'))
 Table('messages',meta,Column('id',Integer,primary_key=True,autoincrement=True),Column('conversation',Text,ForeignKey('conversations.id',ondelete='CASCADE'),index=True),Column('role',Text),Column('content',Text))
 Table('reports',meta,Column('id',Text,primary_key=True),Column('owner',Text,ForeignKey('users.id',ondelete='CASCADE'),index=True),Column('conversation',Text,ForeignKey('conversations.id',ondelete='SET NULL'),index=True),Column('day',Text),Column('body',Text),Column('created_at',Float,server_default='0'))
@@ -19,7 +19,7 @@ Table('audit',meta,Column('id',Integer,primary_key=True,autoincrement=True),Colu
 Table('knowledge',meta,Column('id',Text,primary_key=True),Column('title',Text),Column('content',Text),Column('source',Text),Column('reviewed_at',Text),Column('tags',Text))
 Table('schema_versions',meta,Column('version',Integer,primary_key=True),Column('applied_at',Float))
 
-ADDITIONS={'users':{'full_name':"TEXT DEFAULT ''",'username':"TEXT DEFAULT ''",'memory_enabled':'INTEGER DEFAULT 0','verified':'INTEGER DEFAULT 0','is_admin':'INTEGER DEFAULT 0'},'conversations':{'title':"TEXT DEFAULT 'Nova conversa'",'busy_until':'FLOAT DEFAULT 0'},'reports':{'created_at':'FLOAT DEFAULT 0'}}
+ADDITIONS={'users':{'full_name':"TEXT DEFAULT ''",'username':"TEXT DEFAULT ''",'memory_enabled':'INTEGER DEFAULT 0','verified':'INTEGER DEFAULT 0','is_admin':'INTEGER DEFAULT 0','mfa_secret':"TEXT DEFAULT ''",'mfa_pending':"TEXT DEFAULT ''",'mfa_pending_until':'FLOAT DEFAULT 0','mfa_counter':'INTEGER DEFAULT -1','mfa_backups':"TEXT DEFAULT '[]'"},'conversations':{'title':"TEXT DEFAULT 'Nova conversa'",'busy_until':'FLOAT DEFAULT 0'},'reports':{'created_at':'FLOAT DEFAULT 0'}}
 
 def make_engine(url):
     if url.startswith('postgres://'):url=url.replace('postgres://','postgresql+psycopg://',1)
@@ -42,7 +42,7 @@ def migrate(engine):
                 if name not in existing:conn.execute(text(f'ALTER TABLE {table} ADD COLUMN {name} {ddl}'))
         conn.execute(text("CREATE UNIQUE INDEX IF NOT EXISTS users_username_unique ON users(username) WHERE username <> ''"))
         conn.execute(text('INSERT INTO schema_versions(version,applied_at) VALUES (2,:now) ON CONFLICT(version) DO NOTHING'),{'now':time.time()})
-        conn.execute(text('INSERT INTO schema_versions(version,applied_at) VALUES (3,:now) ON CONFLICT(version) DO NOTHING'),{'now':time.time()})
+        conn.execute(text('INSERT INTO schema_versions(version,applied_at) VALUES (4,:now) ON CONFLICT(version) DO NOTHING'),{'now':time.time()})
 
 class Row:
     def __init__(self,row):self.row=row

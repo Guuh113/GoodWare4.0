@@ -65,3 +65,27 @@ def test_clock_both_chat_modes(tmp_path):
         r=a.post('/api/chat',json={'conversation_id':cid,'mensagem':'Que horas são?','time_zone':'UTC','stream':stream},headers=h)
         assert r.status_code==200 and 'UTC' in r.get_data(as_text=True)
     assert len(a.get('/api/conversations/'+cid).json['messages'])==4
+
+def test_connected_sessions_revoke_and_isolation(tmp_path):
+    app=create_app({'TESTING':True,'SECRET_KEY':'tests','DATABASE':str(tmp_path/'sessions.sqlite')})
+    a,h=account(app)
+    b=app.test_client();hb={'X-CSRF-Token':b.get('/api/auth/session').json['csrf']}
+    b.post('/api/auth/login',json={'email':'a@example.com','password':'long-test-password'},headers=hb)
+    sessions=a.get('/api/account/sessions').json
+    assert len(sessions)==2 and sum(x['current'] for x in sessions)==1
+    other=next(x['id'] for x in sessions if not x['current'])
+    assert a.delete('/api/account/sessions/'+other,json={}).status_code==403
+    assert a.delete('/api/account/sessions/'+other,json={},headers=h).status_code==200
+    assert b.get('/api/historico').status_code==401
+    assert a.get('/api/historico').status_code==200
+    assert a.delete('/api/account/sessions/not-owned',json={},headers=h).status_code==404
+
+def test_web_search_opt_in_isolated_context(monkeypatch,tmp_path):
+    import app as module
+    seen=[]
+    monkeypatch.setattr(module,'search_web',lambda message,zone: seen.append((message,zone)) or 'Pesquisa concluída com fonte: https://example.com')
+    app=create_app({'TESTING':True,'SECRET_KEY':'test','DATABASE':str(tmp_path/'web.sqlite')})
+    a,h=account(app);cid=conv(a,h);upload(a,h,cid)
+    response=a.post('/api/chat',json={'conversation_id':cid,'mensagem':'Pesquisa pública','web_search':True,'time_zone':'UTC'},headers=h)
+    assert response.status_code==200 and seen==[('Pesquisa pública','UTC')]
+    assert response.json['sources']==[]

@@ -381,6 +381,14 @@ h2 {
 .gw-risk-criteria{margin-top:12px;font-size:12px;color:#b6b6c2}.gw-risk-criteria summary{cursor:pointer;padding:4px 0}
 .gw-risk-unknown .gw-risk-meter{opacity:.35}
 @media(max-width:480px){.gw-risk-panel{padding:16px 12px}.gw-risk-top{gap:6px}.gw-risk-heading{font-size:12px}.gw-risk-badge{font-size:10px}.gw-risk-value{font-size:24px}}
+
+.gw-risk-description{border:1px solid #494951;border-left:4px solid var(--gw-risk-ink);border-radius:10px;padding:16px;margin:18px 0;background:#1a1a20;line-height:1.6}
+.gw-risk-low .gw-risk-description{background:#102a23;border-color:#26745b}
+.gw-risk-attention .gw-risk-description{background:#302817;border-color:#88702b}
+.gw-risk-high .gw-risk-description{background:#321b21;border-color:#95404c}
+.gw-risk-description>strong{color:var(--gw-risk-ink)}
+.gw-risk-description ul{padding-left:20px;margin:12px 0}.gw-risk-description li{margin:10px 0;color:#e0dfe5}
+.gw-risk-description .gw-risk-next{font-weight:600}
 </style><style>body{padding:36px 24px;background:#0b0b0d;color:#ededf0;font-family:Arial,sans-serif}main{max-width:860px;margin:auto}.brand{font-weight:700;color:#a995ff;font-size:22px}h1{font-size:30px;letter-spacing:-1px;margin:36px 0 12px}.intro{color:#aaaab8;line-height:1.6}.note{border-left:3px solid #7b61ff;padding:12px 16px;color:#bfbfc9;background:#15151b;margin:24px 0}.demo-tabs{display:flex;gap:8px;flex-wrap:wrap;margin:20px 0}.demo-tabs button{background:#24212f;border:1px solid #454052;padding:10px 14px;border-radius:8px;color:#eee;cursor:pointer}.demo-tabs button[aria-pressed=true]{background:#6449d8;border-color:#a494ff}footer{font-size:12px;color:#9c9cab;margin-top:22px}</style><main><div class="brand">GoodWare <span style="font-size:12px;color:#bbb;margin-left:12px">PRÉVIA PARA APROVAÇÃO</span></div><h1>Entenda o risco. Decida com contexto.</h1><p class="intro">Novo medidor para seus relatórios. Faixas coloridas, marcador automático e critérios que você pode consultar.</p><div class="demo-tabs" aria-label="Exemplos de visualização"><button data-demo="attention" aria-pressed="true">Atenção · 35</button><button data-demo="low" aria-pressed="false">Baixo · 0</button><button data-demo="high" aria-pressed="false">Alto · 85</button><button data-demo="legacy" aria-pressed="false">Relatório anterior</button></div><div id="preview"></div><div class="note"><strong>Sua conta, em qualquer computador</strong><br>Use o mesmo e-mail e senha no endereço oficial. As credenciais são verificadas no servidor e a senha fica armazenada como hash.</div><p class="intro"><strong>Aegis com contexto de tempo</strong><br>A atualização consulta o relógio do servidor e usa o fuso do navegador para responder “Que horas são?”. Conversas gerais continuam disponíveis com o modelo configurado.</p><footer>Prévia local com exemplos identificados. Não altera relatórios, contas ou a versão publicada.</footer></main><script>'use strict';
 window.GW = {
   csrf: '',
@@ -453,7 +461,38 @@ window.GW = {
     outer.append(meter);
     const scale=this.el('div',undefined,'gw-risk-scale');
     for(const label of ['0 — Baixo','50 — Médio','100 — Alto'])scale.append(this.el('span',label));
-    outer.append(scale,this.el('p',descriptions[risk]));
+    outer.append(scale);
+    const description=this.el('div',undefined,'gw-risk-description');
+    description.append(this.el('strong','Riscos identificados — '+labels[risk]),this.el('p',descriptions[risk]));
+    const impacts={
+      execucao_dinamica:'Pode permitir execução de comandos ou código inesperado se receber entradas não confiáveis.',
+      processo:'Pode iniciar programas, alterar processos ou executar comandos com as permissões do usuário.',
+      download:'Pode transmitir dados ou baixar conteúdo externo. O destino e a finalidade precisam ser conferidos.',
+      persistencia:'Pode configurar execução automática ou recorrente, inclusive após reiniciar o computador.',
+      credenciais:'Pode acessar credenciais, dados sensíveis ou entradas do teclado, dependendo de como for usado.',
+      ofuscacao:'Pode ocultar o conteúdo real de dados ou código e dificultar a revisão; também pode ter uso legítimo.',
+      entropia:'Pode indicar conteúdo compactado ou cifrado, dificultando a inspeção; não confirma ransomware.',
+      permissoes:'Pode permitir modificar código em memória. É necessário conferir se essas permissões são realmente necessárias.',
+      api:'Pode disponibilizar funções sensíveis ao programa. Um import não prova que a função foi executada.'
+    };
+    const urlImpacts={
+      'Conexão sem HTTPS.':'O tráfego pode ser lido ou alterado por terceiros durante a transmissão. Não envie senhas ou dados sensíveis.',
+      'URL contém credenciais antes do domínio.':'O trecho antes de @ pode confundir a identificação do destino e expor credenciais no endereço.',
+      'Domínio internacionalizado; confira possíveis imitações.':'Caracteres visualmente semelhantes podem dificultar perceber um domínio imitado. Confira o endereço oficial.'
+    };
+    const seen=new Set();const list=this.el('ul');
+    for(const e of report.evidencias||[]){
+      const key=e.categoria||e.titulo||e.id;
+      if(seen.has(key))continue;seen.add(key);
+      const item=this.el('li');item.append(this.el('strong',(e.titulo||'Indicador para revisão')+': '));
+      item.append(this.el('span',impacts[e.categoria]||urlImpacts[e.titulo]||e.justificativa||'O impacto depende do contexto. Revise a evidência antes de concluir.'));
+      list.append(item);
+    }
+    if(seen.size)description.append(list);
+    else description.append(this.el('p','Nenhum risco específico foi identificado nos dados disponíveis. A cobertura limitada da análise não permite afirmar que o arquivo ou endereço seja seguro.'));
+    description.append(this.el('p',risk==='high'?'Próximo passo: evite executar, confirme a origem e revise as evidências antes de usar.':risk==='attention'?'Próximo passo: confira o contexto, a origem e os trechos sinalizados.':risk==='low'?'Próximo passo: mantenha os cuidados habituais e confirme a origem antes de abrir.':'Próximo passo: faça uma nova análise de um formato suportado.' ,'gw-risk-next'));
+    description.append(this.el('small','Os impactos acima são possibilidades associadas aos indicadores; não confirmam execução, roubo de dados ou infecção.'));
+    outer.append(description);
     outer.append(this.el('small','Índice de prioridade de revisão, não probabilidade de infecção. O resultado é calculado pela análise e não pode ser alterado manualmente.'));
     if(scored){const criteria=this.el('details',undefined,'gw-risk-criteria');criteria.append(this.el('summary','Como a pontuação é calculada'),this.el('p',report.medidor.criterio),this.el('p',report.medidor.limites));outer.append(criteria);}
     else outer.append(this.el('small','Faça uma nova análise para obter a pontuação com os critérios atuais.'));
@@ -477,7 +516,7 @@ window.GW = {
 };
 </script><script>
 const original={"tipo": "FICHEIRO", "alvo": "exemplo_revisao.py", "sha256": "07de32142b0d5c3fb88b8c93218654866b2fa7a4f2e27f3785d0821d7c59524b", "data": "2026-10-29T01:17:02.930451+00:00", "risco": "médio", "classificacao": "Suspeita heurística", "tipo_ameaca": "Tipo de ameaça ainda não determinado", "confianca": "Limitada: análise estática e heurísticas, sujeitas a falsos positivos e negativos.", "pontuacao_modelo": null, "probabilidade_malware": null, "evidencias": [{"id": "E1", "arquivo": "exemplo_revisao.py", "categoria": "execucao_dinamica", "titulo": "Execução dinâmica", "natureza": "suspeita heurística", "risco": "médio", "localizacao": {"linha": 1}, "trecho": "exec(user_input)", "justificativa": "Código construído dinamicamente pode executar entradas não confiáveis. O padrão sozinho não prova abuso.", "correcao": "Evite avaliar texto como código; prefira parsers e operações permitidas explicitamente."}], "arquivos": [{"tamanho_bytes": 17, "formato": ".py", "caminho": "exemplo_revisao.py", "sha256": "07de32142b0d5c3fb88b8c93218654866b2fa7a4f2e27f3785d0821d7c59524b", "detalhes": {"limite_indicadores": false}}], "explicacao": "Análise estática concluída: 1 indicador(es) em 1 arquivo(s). Não confirma infecção nem identifica família de malware.", "impacto": "Impacto real não determinado. Depende da finalidade e execução do código.", "recomendacao": "Revise os indicadores e evite executar arquivos suspeitos até verificar sua origem.", "limitacoes": ["Não executa arquivos, não monitora o computador, não verifica assinatura digital ou reputação externa.", "Caminhos de ZIP são relativos; o caminho original no computador não está disponível.", "Padrões textuais não fazem análise de fluxo de dados; arquivos não suportados são listados como ignorados.", "Até 100 indicadores por arquivo. Ausência de indicadores não garante segurança."], "medidor": {"valor": 35, "versao": "heuristica-v1", "categorias": ["execucao_dinamica"], "criterio": "35 pontos pela primeira categoria de indicador e 10 por categoria adicional, até 85. Repetições não somam pontos.", "limites": "Índice de prioridade de revisão, não probabilidade de malware. Análise estática pode ter falsos positivos e negativos. Zero não garante segurança."}};
-const samples={attention:original,low:{...original,risco:'baixo',medidor:{...original.medidor,valor:0}},high:{...original,risco:'alto',medidor:{...original.medidor,valor:85}},legacy:{risco:'médio'}};
+const samples={attention:original,low:{...original,evidencias:[],risco:'baixo',medidor:{...original.medidor,valor:0}},high:{...original,evidencias:[{categoria:'execucao_dinamica',titulo:'Execução dinâmica'},{categoria:'credenciais',titulo:'Possível acesso a dados sensíveis'},{categoria:'persistencia',titulo:'Possível persistência'},{categoria:'download',titulo:'Acesso à rede'},{categoria:'ofuscacao',titulo:'Decodificação de dados'},{categoria:'processo',titulo:'Execução de processos'}],risco:'alto',medidor:{...original.medidor,valor:85}},legacy:{risco:'médio'}};
 function show(key){document.getElementById('preview').replaceChildren(GW.riskIndicator(samples[key]));document.querySelectorAll('[data-demo]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.demo===key)));}
 document.querySelectorAll('[data-demo]').forEach(b=>b.onclick=()=>show(b.dataset.demo));show('attention');
 </script></html>

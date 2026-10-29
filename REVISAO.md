@@ -1,6 +1,6 @@
 # Atualização em revisão — contas, medidor e Aegis
 
-Esta branch aguarda aprovação antes de ser integrada à main. O Render acompanha main; não publique esta branch nem faça merge antes do aval do proprietário.
+O proprietário autorizou a publicação desta revisão após a validação dos testes. O Render acompanha main e publica automaticamente após o merge.
 
 ## Contas em qualquer computador
 
@@ -24,6 +24,14 @@ Não há ferramenta de pesquisa web: notícias, clima e outros fatos ao vivo nã
 
 ## Validação
 
-46 testes Python passaram; 1 teste PostgreSQL aguarda execução na CI com banco descartável. 15 testes JavaScript passaram. A fixture antiga de streaming foi alinhada ao contrato em uso: resposta completa do provedor encapsulada em eventos NDJSON, sem salvar falhas como respostas concluídas. A revisão não muda esse contrato.
+46 testes Python passaram; 1 teste PostgreSQL aguarda execução na CI com banco descartável. 17 testes JavaScript passaram. A fixture antiga de streaming foi alinhada ao contrato em uso: resposta completa do provedor encapsulada em eventos NDJSON, sem salvar falhas como respostas concluídas. A revisão não muda esse contrato.
 
-O site de produção permanece na versão anterior até aprovação. SMTP e recuperação por e-mail ainda exigem configuração própria.
+A publicação deve ser verificada no Render após o merge. SMTP e recuperação por e-mail ainda exigem configuração própria.
+
+## Complemento: descrição por nível e assistente geral
+
+Cada relatório agora inclui um bloco de descrição na cor do nível, com impactos possíveis das categorias encontradas e próximos passos. A lista agrupa repetições e preserva evidências como texto, sem interpretar HTML. Padrões de URL também recebem explicação específica. Verde não equivale a garantia de segurança.
+
+A página e a saudação da Aegis passam a apresentar ajuda geral: estudos, programação, textos, ideias e cotidiano. O prompt responde diretamente ao assunto solicitado, sem inserir alertas de malware em perguntas não relacionadas. Continua sem pesquisa web ao vivo e sem promessa de respostas infalíveis.
+
+Domínio: goodware.com já aponta para um site existente. O proprietário informou não possuir esse domínio. Nenhuma compra ou mudança de DNS foi feita; o endereço onrender.com continua válido. Um domínio próprio depende de registro disponível e aprovação do custo.

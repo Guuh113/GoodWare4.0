@@ -12,11 +12,13 @@ from scanner import analyze, MAX_FILE
 from risk import assess_report
 from database import Database, make_engine, migrate
 from sqlalchemy.exc import IntegrityError
+import mfa
+import pyotp
 import mailer
 import knowledge
 import intelligence
 from reports_pdf import render_pdf
-from assistant_service import generate, AssistantUnavailable
+from assistant_service import generate, AssistantUnavailable, search_web, web_search_available
 
 ROOT=Path(__file__).resolve().parent
 load_dotenv(ROOT/'.env')
@@ -89,7 +91,7 @@ def create_app(test_config=None):
     @app.before_request
     def rate_limit():
         if not request.path.startswith('/api/'):return None
-        now=time.time();window=600 if request.path.startswith(('/api/auth/','/api/password/','/api/token/','/api/email/')) and request.method=='POST' else 60
+        now=time.time();window=600 if request.path.startswith(('/api/auth/','/api/password/','/api/token/','/api/email/','/api/account/mfa')) and request.method in ('POST','DELETE') else 60
         limit=20 if window==600 else (10 if request.path=='/api/chat' else 90)
         # Independent IP and account limits; IP is hashed and X-Forwarded-For is not trusted.
         identity=(session.get('user') or request.remote_addr or 'local') if window==60 else (request.remote_addr or 'local')
@@ -138,6 +140,56 @@ def create_app(test_config=None):
             d.execute('UPDATE users SET password=? WHERE id=?',(generate_password_hash(password),uid));d.execute('DELETE FROM auth_sessions WHERE owner=?',(uid,))
         else:d.execute('UPDATE users SET verified=1 WHERE id=?',(uid,))
         audit('token.'+purpose,uid);d.commit();return jsonify(ok=True,message='Senha atualizada. Faça login.' if purpose=='reset' else 'E-mail confirmado. Faça login.')
+    @app.route('/api/account/mfa',methods=['GET','POST','DELETE'])
+    @login_required
+    def account_mfa():
+        d=db();uid=session['user']
+        if request.method=='GET':
+            u=d.execute('SELECT mfa_secret FROM users WHERE id=?',(uid,)).fetchone()
+            return jsonify(enabled=bool(u[0]))
+        data=body();d.execute('BEGIN IMMEDIATE');d.lock_user(uid)
+        u=d.execute('SELECT * FROM users WHERE id=?',(uid,)).fetchone()
+        password=data.get('password')
+        if not isinstance(password,str) or not check_password_hash(u['password'],password):
+            d.rollback();return jsonify(erro='Confirme sua senha atual.'),403
+        if request.method=='DELETE':
+            if not u['mfa_secret'] or not mfa.consume(d,u,data.get('code'),app.config['SECRET_KEY']):
+                d.rollback();return jsonify(erro='Código inválido ou já utilizado.'),400
+            d.execute("UPDATE users SET mfa_secret='',mfa_pending='',mfa_backups='[]',mfa_counter=-1 WHERE id=?",(uid,))
+            d.execute('DELETE FROM auth_sessions WHERE owner=? AND id<>?',(uid,digest(session['sid'])))
+            audit('mfa.disabled');d.commit();return jsonify(message='Verificação em duas etapas desativada. Outras sessões foram encerradas.')
+        if u['mfa_secret']:
+            d.rollback();return jsonify(erro='A verificação em duas etapas já está ativa.'),409
+        if data.get('action')=='setup':
+            secret=pyotp.random_base32()
+            d.execute('UPDATE users SET mfa_pending=?,mfa_pending_until=? WHERE id=?',(mfa.cipher(app.config['SECRET_KEY']).encrypt(secret.encode()).decode(),time.time()+600,uid));d.commit()
+            return jsonify(secret=secret,message='Adicione esta chave ao seu autenticador como TOTP (6 dígitos, 30 segundos) e confirme o código em até 10 minutos.')
+        if not u['mfa_pending'] or u['mfa_pending_until']<time.time():
+            d.rollback();return jsonify(erro='Inicie a configuração novamente.'),400
+        secret=mfa.cipher(app.config['SECRET_KEY']).decrypt(u['mfa_pending'].encode()).decode()
+        counter=mfa.matching_counter(secret,data.get('code'))
+        if counter is None:
+            d.rollback();return jsonify(erro='Código inválido. Confira a hora do autenticador.'),400
+        backups=[secrets.token_hex(8) for _ in range(8)]
+        d.execute("UPDATE users SET mfa_secret=mfa_pending,mfa_pending='',mfa_counter=?,mfa_backups=? WHERE id=?",(counter,json.dumps([mfa.backup_hash(c) for c in backups]),uid))
+        d.execute('DELETE FROM auth_sessions WHERE owner=? AND id<>?',(uid,digest(session['sid'])))
+        audit('mfa.enabled');d.commit();return jsonify(message='Verificação em duas etapas ativada. Guarde os códigos de recuperação; cada um só pode ser usado uma vez.',backup_codes=backups)
+
+    @app.get('/api/account/sessions')
+    @login_required
+    def account_sessions():
+        current=digest(session['sid'])
+        return jsonify([{'id':r['id'],'expires':r['expires'],'current':r['id']==current} for r in db().execute('SELECT id,expires FROM auth_sessions WHERE owner=? AND expires>? ORDER BY expires DESC',(session['user'],time.time())).fetchall()])
+
+    @app.delete('/api/account/sessions/<sid>')
+    @login_required
+    def revoke_session(sid):
+        result=db().execute('DELETE FROM auth_sessions WHERE id=? AND owner=?',(sid,session['user']))
+        db().commit()
+        if not result.rowcount:return jsonify(erro='Sessão não encontrada.'),404
+        if sid==digest(session['sid']):session.clear()
+        return jsonify(message='Sessão encerrada.')
+
     @app.route('/api/account',methods=['GET','PATCH','DELETE'])
     @login_required
     def account():
@@ -226,7 +278,7 @@ def create_app(test_config=None):
         return jsonify(analyses=len(records),files=sum(len(r.get('arquivos',[])) for r in records),indicators=sum(len(r['evidencias']) for r in records),high=sum(r.get('risco')=='alto' for r in records))
     @app.get('/api/status')
     @login_required
-    def service_status():return jsonify(llm_configured=bool(os.getenv('LLM_BASE_URL') and os.getenv('LLM_MODEL')),mail_configured=mailer.configured(),database='PostgreSQL' if engine.dialect.name=='postgresql' else 'SQLite (desenvolvimento)')
+    def service_status():return jsonify(web_search_available=web_search_available(),llm_configured=bool(os.getenv('LLM_BASE_URL') and os.getenv('LLM_MODEL')),mail_configured=mailer.configured(),database='PostgreSQL' if engine.dialect.name=='postgresql' else 'SQLite (desenvolvimento)')
     @app.get('/api/admin')
     @login_required
     def admin():
@@ -300,6 +352,10 @@ def create_app(test_config=None):
         if not check_password_hash(user['password'] if user else dummy_hash,password):return jsonify(erro='Credenciais inválidas.'),401
         if not user:return jsonify(erro='Credenciais inválidas.'),401
         if os.getenv('EMAIL_VERIFICATION_REQUIRED')=='1' and not user['verified']:return jsonify(erro='Confirme seu e-mail antes de entrar.'),403
+        d.execute('BEGIN IMMEDIATE');d.lock_user(user['id'])
+        user=d.execute('SELECT * FROM users WHERE id=?',(user['id'],)).fetchone()
+        if user['mfa_secret'] and not mfa.consume(d,user,data.get('code'),app.config['SECRET_KEY']):
+            d.rollback();return jsonify(erro='Informe o código do autenticador ou um código de recuperação ainda não utilizado.'),401
         sid=secrets.token_urlsafe(32);session.clear();session.update(user=user['id'],sid=sid,csrf=secrets.token_hex(32))
         d.execute('INSERT INTO auth_sessions VALUES(?,?,?)',(digest(sid),user['id'],time.time()+86400))
         audit('auth.login');d.commit();return jsonify(ok=True,csrf=session['csrf'])
@@ -383,12 +439,14 @@ def create_app(test_config=None):
         explicit={r['id'] for r in reports}
         reports=[r for r in remembered if r['id'] not in explicit]+reports
         docs=knowledge.retrieve(db(),message)
+        use_web=data.get('web_search') is True
+        if use_web:docs=[]
         # Perfil é consultado apenas para personalizar a conversa do próprio usuário.
         user_profile=db().execute('SELECT full_name,username FROM users WHERE id=?',(session['user'],)).fetchone()
         profile_name=(user_profile['full_name'] or user_profile['username'] or '') if user_profile else ''
         # Atomic lease prevents simultaneous generations from reordering a conversation.
         now=time.time()
-        leased=db().execute('UPDATE conversations SET busy_until=? WHERE id=? AND owner=? AND busy_until<?',(now+180,cid,session['user'],now)).rowcount
+        leased=db().execute('UPDATE conversations SET busy_until=? WHERE id=? AND owner=? AND busy_until<?',(now+300,cid,session['user'],now)).rowcount
         db().commit()
         if not leased:return jsonify(erro='Aguarde a resposta anterior nesta conversa.'),409
         if data.get('stream') is True:
@@ -398,9 +456,9 @@ def create_app(test_config=None):
                 try:
                     # Compatibilidade com modelos locais: evita depender do streaming do provedor.
                     # Mantem o protocolo NDJSON esperado pelo frontend do GoodWare.
-                    answer=generate(hist,reports,message,knowledge_docs=docs,previous=previous,user_name=profile_name,time_zone=data.get('time_zone'),stream=False)
+                    answer=search_web(message,data.get('time_zone')) if use_web else generate(hist,reports,message,knowledge_docs=docs,previous=previous,user_name=profile_name,time_zone=data.get('time_zone'),stream=False)
                     if not isinstance(answer,str) or not answer.strip():
-                        raise AssistantUnavailable('A IA retornou uma resposta vazia. Verifique o Ollama.')
+                        raise AssistantUnavailable('A IA retornou uma resposta vazia. Tente novamente em instantes.')
                     yield packet('delta',text=answer)
                     if not valid_session() or not owned(cid):
                         yield packet('error',message='Conversa indisponível; resposta não salva.');return
@@ -413,12 +471,12 @@ def create_app(test_config=None):
                 except AssistantUnavailable as e:yield packet('error',message=str(e))
                 except Exception:
                     app.logger.exception('Erro inesperado na resposta da Aegis AI')
-                    yield packet('error',message='Falha ao consultar a IA. Consulte o terminal do GoodWare.')
+                    yield packet('error',message='Falha ao consultar a IA. Tente novamente em instantes.')
                 finally:
                     db().execute('UPDATE conversations SET busy_until=0 WHERE id=?',(cid,));db().commit()
             return app.response_class(events(),mimetype='application/x-ndjson',headers={'X-Accel-Buffering':'no'})
         try:
-            answer=generate(hist,reports,message,knowledge_docs=docs,previous=previous,user_name=profile_name,time_zone=data.get('time_zone'))
+            answer=search_web(message,data.get('time_zone')) if use_web else generate(hist,reports,message,knowledge_docs=docs,previous=previous,user_name=profile_name,time_zone=data.get('time_zone'))
             # Recheck authorization after external generation: a conversation/account may have been deleted.
             if not valid_session() or not owned(cid):return jsonify(erro='Conversa indisponível.'),404
             db().executemany('INSERT INTO messages(conversation,role,content) VALUES(?,?,?)',[(cid,'user',message),(cid,'assistant',answer)])

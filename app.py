@@ -494,7 +494,7 @@ def create_app(test_config=None):
         # Never expose Python, pickle, database, credentials or samples.
         private={'painel.html','analisar.html','achado.html','aegis.html','historico.html','perfil.html','admin.html','radar.html','knowledge.html'}
         if path in private and not valid_session():return redirect('/login.html')
-        if path in {'cadastro.html','recuperar.html','redefinir.html','verificar.html','aegis.html','historico.html','perfil.html','admin.html','index.html','analisar.html','achado.html','login.html','painel.html','Antivírus.html','radar.html','knowledge.html'} or (path.startswith(('css/','js/')) and Path(path).suffix in ('.css','.js') and '..' not in Path(path).parts):
+        if path in {'previa.html','cadastro.html','recuperar.html','redefinir.html','verificar.html','aegis.html','historico.html','perfil.html','admin.html','index.html','analisar.html','achado.html','login.html','painel.html','Antivírus.html','radar.html','knowledge.html'} or (path.startswith(('css/','js/')) and Path(path).suffix in ('.css','.js') and '..' not in Path(path).parts):
             return send_from_directory(ROOT,path)
         if path.startswith('api/'):return jsonify(erro='Rota da API não encontrada.'),404
         return 'Não encontrado',404

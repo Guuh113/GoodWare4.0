@@ -14,7 +14,7 @@
    if(data.password_confirmation!==undefined&&data.password!==data.password_confirmation)throw new Error('As senhas não coincidem.');
    await GW.init(false);
    let result;
-   if(mode==='login'){await GW.api('/api/auth/login',data);const session=await GW.init(false);if(!session.authenticated)throw new Error('O login foi aceito, mas o navegador não manteve a sessão. Permita cookies para este endereço e use sempre o mesmo endereço aberto pelo iniciador. Em HTTP local, confira COOKIE_SECURE=0 no .env.');location.href='painel.html';return;}
+   if(mode==='login'){await GW.api('/api/auth/login',data);const session=await GW.init(false);if(!session.authenticated)throw new Error('O login foi aceito, mas o navegador não manteve a sessão. Permita cookies para este site e tente novamente pelo endereço oficial do GoodWare.');location.href='painel.html';return;}
    if(mode==='cadastro'){result=await GW.api('/api/auth/register',data);form.hidden=true;}
    if(mode==='recuperar')result=await GW.api('/api/password/request',data);
    if(mode==='redefinir'||mode==='verificar'){

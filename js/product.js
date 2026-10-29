@@ -47,7 +47,7 @@
    function pending(value){busy=value;document.querySelectorAll('.chat-layout button,.chat-layout select').forEach(n=>n.disabled=value);$('message').disabled=value;updateSendButton();}
    async function list(){const items=await GW.api('/api/conversations');$('conversationList').replaceChildren();for(const c of items){const b=el('button',c.title||'Nova conversa',c.id===cid?'active':'');b.onclick=()=>{if(!busy)action(b,()=>load(c.id));};$('conversationList').append(b);}return items;}
    async function load(id){pending(true);try{const data=await GW.api('/api/conversations/'+id);cid=id;history.replaceState(null,'','aegis.html?conversation='+encodeURIComponent(cid));$('messages').replaceChildren();data.messages.forEach(m=>message(m.content,m.role));
-     if(!data.messages.length)message('Sou Aegis AI, assistente de cibersegurança do GoodWare. Como posso ajudar na sua investigação?');
+     if(!data.messages.length)message('Olá! Sou a Aegis. Posso ajudar com estudos, programação, textos, ideias e segurança digital. Você também pode perguntar a hora ou enviar um arquivo para análise. O que vamos fazer hoje?');
      selected=data.reports.length?data.reports[data.reports.length-1].id:'';$('reportSelect').value=selected;
      await list();}finally{pending(false);}}
    async function newChat(){selected='';const c=await GW.api('/api/conversations',{});await load(c.id);}

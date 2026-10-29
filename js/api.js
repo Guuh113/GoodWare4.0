@@ -34,7 +34,9 @@ window.GW = {
     this.csrf=d.csrf;
     if(required&&!d.authenticated){location.href='login.html';throw new Error('Entre na sua conta.');}return d;
   },
+  timeZone() { try {return Intl.DateTimeFormat().resolvedOptions().timeZone||'America/Sao_Paulo';} catch {return 'America/Sao_Paulo';} },
   async api(url, data, method) {
+    if(url==='/api/chat' && data) data={...data,time_zone:this.timeZone()};
     if(data&&!this.csrf) await this.init(false);
     const opts={method:method||(data?'POST':'GET'),headers:{}};
     if(data){opts.headers['X-CSRF-Token']=this.csrf;if(data instanceof FormData)opts.body=data;
@@ -43,29 +45,66 @@ window.GW = {
     if(d.csrf)this.csrf=d.csrf;return d;
   },
   riskIndicator(report) {
-    // Indicador categórico: NÃO é chance estatística de malware.
     const normalized=String(report.risco||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'');
-    const risk=normalized.includes('critico')||normalized.includes('alto')?'high':
-      normalized.includes('medio')||normalized.includes('moderado')?'attention':
-      normalized.includes('baixo')?'low':'unknown';
-    const labels={
-      high:['Perigo — alto risco','Há indícios importantes: não execute sem investigar.',85],
-      attention:['Atenção — investigar','Padrões suspeitos exigem uma verificação adicional.',50],
-      low:['Baixo risco estimado','A análise não encontrou indícios de alto risco; não é garantia de segurança.',15],
-      unknown:['Risco indeterminado','Os dados disponíveis não permitem classificar o risco.',0]
-    };
-    const [label,description,position]=labels[risk];
-    const outer=this.el('div',undefined,'gw-risk-panel gw-risk-'+risk);
-    const heading=this.el('div',undefined,'gw-risk-heading');
+    const value=report.medidor?.valor;
+    const scored=typeof value==='number' && Number.isFinite(value) && value>=0 && value<=100;
+    const risk=scored?(value>=70?'high':value>=30?'attention':'low'):
+      normalized==='alto'?'high':normalized==='medio'?'attention':normalized==='baixo'?'low':'unknown';
+    const labels={high:'Alto — investigar',attention:'Atenção',low:'Baixo',unknown:'Indeterminado'};
+    const descriptions={high:'Há vários tipos de indicadores. Evite executar o arquivo até investigar.',attention:'É recomendável investigar os indicadores.',low:'Nenhum indicador relevante nas verificações realizadas. Isso não garante segurança.',unknown:'Os dados disponíveis não permitem classificar o risco.'};
+    const outer=this.el('section',undefined,'gw-risk-panel gw-risk-'+risk);
+    const top=this.el('div',undefined,'gw-risk-top');
+    top.append(this.el('strong','Medidor de risco'),this.el('span',scored?'Análise heurística':'Relatório anterior','gw-risk-badge'));
+    const row=this.el('div',undefined,'gw-risk-top');
+    row.append(this.el('strong',scored?value+'/100':'Sem pontuação','gw-risk-value'));
+    const status=this.el('span',undefined,'gw-risk-heading');
     const dot=this.el('span',undefined,'gw-risk-dot');dot.setAttribute('aria-hidden','true');
-    heading.append(dot,this.el('strong',label));
-    outer.append(heading,this.el('p',description));
+    status.append(dot,this.el('strong',labels[risk]));row.append(status);outer.append(top,row);
     const meter=this.el('div',undefined,'gw-risk-meter');
-    meter.setAttribute('role','img');
-    meter.setAttribute('aria-label','Medidor visual categórico: '+label);
-    const pointer=this.el('span',undefined,'gw-risk-pointer');
-    pointer.style.left=position+'%';meter.append(pointer);outer.append(meter);
-    outer.append(this.el('small','Medidor visual da categoria heurística, não probabilidade de infecção.'));
+    for(const band of ['low','attention','high'])meter.append(this.el('span',undefined,'gw-risk-band gw-band-'+band));
+    if(scored){
+      meter.setAttribute('role','meter');meter.setAttribute('aria-label','Índice heurístico de risco');
+      meter.setAttribute('aria-valuemin','0');meter.setAttribute('aria-valuemax','100');meter.setAttribute('aria-valuenow',String(value));meter.setAttribute('aria-valuetext',value+' de 100: '+labels[risk]+'. Não é probabilidade de infecção.');
+      const pointer=this.el('span',undefined,'gw-risk-pointer');pointer.style.left=value+'%';meter.append(pointer);
+    }else {meter.setAttribute('aria-hidden','true');}
+    outer.append(meter);
+    const scale=this.el('div',undefined,'gw-risk-scale');
+    for(const label of ['0 — Baixo','50 — Médio','100 — Alto'])scale.append(this.el('span',label));
+    outer.append(scale);
+    const description=this.el('div',undefined,'gw-risk-description');
+    description.append(this.el('strong','Riscos identificados — '+labels[risk]),this.el('p',descriptions[risk]));
+    const impacts={
+      execucao_dinamica:'Pode permitir execução de comandos ou código inesperado se receber entradas não confiáveis.',
+      processo:'Pode iniciar programas, alterar processos ou executar comandos com as permissões do usuário.',
+      download:'Pode transmitir dados ou baixar conteúdo externo. O destino e a finalidade precisam ser conferidos.',
+      persistencia:'Pode configurar execução automática ou recorrente, inclusive após reiniciar o computador.',
+      credenciais:'Pode acessar credenciais, dados sensíveis ou entradas do teclado, dependendo de como for usado.',
+      ofuscacao:'Pode ocultar o conteúdo real de dados ou código e dificultar a revisão; também pode ter uso legítimo.',
+      entropia:'Pode indicar conteúdo compactado ou cifrado, dificultando a inspeção; não confirma ransomware.',
+      permissoes:'Pode permitir modificar código em memória. É necessário conferir se essas permissões são realmente necessárias.',
+      api:'Pode disponibilizar funções sensíveis ao programa. Um import não prova que a função foi executada.'
+    };
+    const urlImpacts={
+      'Conexão sem HTTPS.':'O tráfego pode ser lido ou alterado por terceiros durante a transmissão. Não envie senhas ou dados sensíveis.',
+      'URL contém credenciais antes do domínio.':'O trecho antes de @ pode confundir a identificação do destino e expor credenciais no endereço.',
+      'Domínio internacionalizado; confira possíveis imitações.':'Caracteres visualmente semelhantes podem dificultar perceber um domínio imitado. Confira o endereço oficial.'
+    };
+    const seen=new Set();const list=this.el('ul');
+    for(const e of report.evidencias||[]){
+      const key=e.categoria||e.titulo||e.id;
+      if(seen.has(key))continue;seen.add(key);
+      const item=this.el('li');item.append(this.el('strong',(e.titulo||'Indicador para revisão')+': '));
+      item.append(this.el('span',impacts[e.categoria]||urlImpacts[e.titulo]||e.justificativa||'O impacto depende do contexto. Revise a evidência antes de concluir.'));
+      list.append(item);
+    }
+    if(seen.size)description.append(list);
+    else description.append(this.el('p','Nenhum risco específico foi identificado nos dados disponíveis. A cobertura limitada da análise não permite afirmar que o arquivo ou endereço seja seguro.'));
+    description.append(this.el('p',risk==='high'?'Próximo passo: evite executar, confirme a origem e revise as evidências antes de usar.':risk==='attention'?'Próximo passo: confira o contexto, a origem e os trechos sinalizados.':risk==='low'?'Próximo passo: mantenha os cuidados habituais e confirme a origem antes de abrir.':'Próximo passo: faça uma nova análise de um formato suportado.' ,'gw-risk-next'));
+    description.append(this.el('small','Os impactos acima são possibilidades associadas aos indicadores; não confirmam execução, roubo de dados ou infecção.'));
+    outer.append(description);
+    outer.append(this.el('small','Índice de prioridade de revisão, não probabilidade de infecção. O resultado é calculado pela análise e não pode ser alterado manualmente.'));
+    if(scored){const criteria=this.el('details',undefined,'gw-risk-criteria');criteria.append(this.el('summary','Como a pontuação é calculada'),this.el('p',report.medidor.criterio),this.el('p',report.medidor.limites));outer.append(criteria);}
+    else outer.append(this.el('small','Faça uma nova análise para obter a pontuação com os critérios atuais.'));
     return outer;
   },
   report(r) {

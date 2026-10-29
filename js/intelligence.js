@@ -14,7 +14,7 @@ GW.markdown=(target,value)=>{
 GW.streamChat=async(data,onText)=>{
  const ctrl=new AbortController(),timer=setTimeout(()=>ctrl.abort(),65000);let text='',done=false,sources=[];
  try{
-  const response=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':GW.csrf},body:JSON.stringify({...data,stream:true}),signal:ctrl.signal});
+  const response=await fetch('/api/chat',{method:'POST',headers:{'Content-Type':'application/json','X-CSRF-Token':GW.csrf},body:JSON.stringify({...data,time_zone:GW.timeZone(),stream:true}),signal:ctrl.signal});
   if(!response.ok){const d=await response.json();throw new Error(d.erro||'Não foi possível conversar com a Aegis.');}
   if(!response.headers.get('Content-Type')?.includes('application/x-ndjson'))throw new Error('Formato de resposta incompatível.');
   const reader=response.body.getReader(),decoder=new TextDecoder();let buffer='';

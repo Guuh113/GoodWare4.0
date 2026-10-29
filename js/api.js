@@ -70,7 +70,38 @@ window.GW = {
     outer.append(meter);
     const scale=this.el('div',undefined,'gw-risk-scale');
     for(const label of ['0 — Baixo','50 — Médio','100 — Alto'])scale.append(this.el('span',label));
-    outer.append(scale,this.el('p',descriptions[risk]));
+    outer.append(scale);
+    const description=this.el('div',undefined,'gw-risk-description');
+    description.append(this.el('strong','Riscos identificados — '+labels[risk]),this.el('p',descriptions[risk]));
+    const impacts={
+      execucao_dinamica:'Pode permitir execução de comandos ou código inesperado se receber entradas não confiáveis.',
+      processo:'Pode iniciar programas, alterar processos ou executar comandos com as permissões do usuário.',
+      download:'Pode transmitir dados ou baixar conteúdo externo. O destino e a finalidade precisam ser conferidos.',
+      persistencia:'Pode configurar execução automática ou recorrente, inclusive após reiniciar o computador.',
+      credenciais:'Pode acessar credenciais, dados sensíveis ou entradas do teclado, dependendo de como for usado.',
+      ofuscacao:'Pode ocultar o conteúdo real de dados ou código e dificultar a revisão; também pode ter uso legítimo.',
+      entropia:'Pode indicar conteúdo compactado ou cifrado, dificultando a inspeção; não confirma ransomware.',
+      permissoes:'Pode permitir modificar código em memória. É necessário conferir se essas permissões são realmente necessárias.',
+      api:'Pode disponibilizar funções sensíveis ao programa. Um import não prova que a função foi executada.'
+    };
+    const urlImpacts={
+      'Conexão sem HTTPS.':'O tráfego pode ser lido ou alterado por terceiros durante a transmissão. Não envie senhas ou dados sensíveis.',
+      'URL contém credenciais antes do domínio.':'O trecho antes de @ pode confundir a identificação do destino e expor credenciais no endereço.',
+      'Domínio internacionalizado; confira possíveis imitações.':'Caracteres visualmente semelhantes podem dificultar perceber um domínio imitado. Confira o endereço oficial.'
+    };
+    const seen=new Set();const list=this.el('ul');
+    for(const e of report.evidencias||[]){
+      const key=e.categoria||e.titulo||e.id;
+      if(seen.has(key))continue;seen.add(key);
+      const item=this.el('li');item.append(this.el('strong',(e.titulo||'Indicador para revisão')+': '));
+      item.append(this.el('span',impacts[e.categoria]||urlImpacts[e.titulo]||e.justificativa||'O impacto depende do contexto. Revise a evidência antes de concluir.'));
+      list.append(item);
+    }
+    if(seen.size)description.append(list);
+    else description.append(this.el('p','Nenhum risco específico foi identificado nos dados disponíveis. A cobertura limitada da análise não permite afirmar que o arquivo ou endereço seja seguro.'));
+    description.append(this.el('p',risk==='high'?'Próximo passo: evite executar, confirme a origem e revise as evidências antes de usar.':risk==='attention'?'Próximo passo: confira o contexto, a origem e os trechos sinalizados.':risk==='low'?'Próximo passo: mantenha os cuidados habituais e confirme a origem antes de abrir.':'Próximo passo: faça uma nova análise de um formato suportado.' ,'gw-risk-next'));
+    description.append(this.el('small','Os impactos acima são possibilidades associadas aos indicadores; não confirmam execução, roubo de dados ou infecção.'));
+    outer.append(description);
     outer.append(this.el('small','Índice de prioridade de revisão, não probabilidade de infecção. O resultado é calculado pela análise e não pode ser alterado manualmente.'));
     if(scored){const criteria=this.el('details',undefined,'gw-risk-criteria');criteria.append(this.el('summary','Como a pontuação é calculada'),this.el('p',report.medidor.criterio),this.el('p',report.medidor.limites));outer.append(criteria);}
     else outer.append(this.el('small','Faça uma nova análise para obter a pontuação com os critérios atuais.'));

@@ -1,0 +1,6 @@
+const {test}=require('node:test'),assert=require('node:assert/strict'),vm=require('node:vm'),fs=require('node:fs');
+class Element{constructor(tag){this.tag=tag;this.children=[];this.attrs={};this.style={};}append(...items){this.children.push(...items);}setAttribute(k,v){this.attrs[k]=v;}}
+function render(r){const ctx={window:{},document:{createElement:tag=>new Element(tag)}};vm.runInNewContext(fs.readFileSync('js/api.js','utf8'),ctx);return ctx.window.GW.riskIndicator(r);}
+function all(n){return [n,...n.children.flatMap(all)];}
+test('medidor mostra valor real e é somente leitura',()=>{for(const value of [0,35,85,100]){const nodes=all(render({medidor:{valor:value,criterio:'Critério',limites:'Limites'}}));const meter=nodes.find(n=>n.attrs.role==='meter');assert.equal(meter.attrs['aria-valuenow'],String(value));assert(nodes.some(n=>n.textContent===value+'/100'));assert(!nodes.some(n=>n.tag==='input'));}});
+test('legados e valores inválidos não recebem nota inventada',()=>{for(const value of [undefined,null,'35',NaN,Infinity,-1,101]){const nodes=all(render({risco:'médio',medidor:{valor:value}}));assert(!nodes.some(n=>n.attrs.role==='meter'));assert(nodes.some(n=>n.textContent==='Sem pontuação'));}});

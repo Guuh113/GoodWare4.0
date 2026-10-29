@@ -35,13 +35,12 @@ def test_clear_history_requires_password_and_csrf(app):
 
 def test_stream_persists_only_complete_responses(app,monkeypatch):
     c,h=account(app);cid=conv(c,h)
-    monkeypatch.setattr('app.generate',lambda *a,**kw:iter(['Olá, ','veja E1.']))
+    monkeypatch.setattr('app.generate',lambda *a,**kw:'Olá, veja E1.')
     r=c.post('/api/chat',json={'conversation_id':cid,'mensagem':'Explique','stream':True},headers=h)
     events=[json.loads(line) for line in r.data.splitlines()]
-    assert [e['type'] for e in events]==['delta','delta','done']
+    assert [e['type'] for e in events]==['delta','done']
     assert c.get('/api/conversations/'+cid).json['messages'][-1]['content']=='Olá, veja E1.'
     def failure(*a,**kw):
-        yield 'Parcial'
         raise AssistantUnavailable('Falha controlada')
     monkeypatch.setattr('app.generate',failure)
     r=c.post('/api/chat',json={'conversation_id':cid,'mensagem':'Outra','stream':True},headers=h)

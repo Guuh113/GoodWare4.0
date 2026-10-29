@@ -9,6 +9,7 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 from werkzeug.security import generate_password_hash, check_password_hash
 from dotenv import load_dotenv
 from scanner import analyze, MAX_FILE
+from risk import assess_report
 from database import Database, make_engine, migrate
 from sqlalchemy.exc import IntegrityError
 import mailer
@@ -60,6 +61,7 @@ def create_app(test_config=None):
         n=db().execute('SELECT count(*) FROM reports WHERE owner=? AND day=?',(session['user'],datetime.now(timezone.utc).date().isoformat())).fetchone()[0]
         return dict(plano='Local',varreduras_feitas=n,limite_diario=app.config['DAILY_LIMIT'])
     def save_report(r,cid):
+        assess_report(r)
         db().execute('BEGIN IMMEDIATE')
         db().lock_user(session['user'])
         if not valid_session():db().rollback();return jsonify(erro='Sessão encerrada.'),401
@@ -396,7 +398,7 @@ def create_app(test_config=None):
                 try:
                     # Compatibilidade com modelos locais: evita depender do streaming do provedor.
                     # Mantem o protocolo NDJSON esperado pelo frontend do GoodWare.
-                    answer=generate(hist,reports,message,knowledge_docs=docs,previous=previous,user_name=profile_name,stream=False)
+                    answer=generate(hist,reports,message,knowledge_docs=docs,previous=previous,user_name=profile_name,time_zone=data.get('time_zone'),stream=False)
                     if not isinstance(answer,str) or not answer.strip():
                         raise AssistantUnavailable('A IA retornou uma resposta vazia. Verifique o Ollama.')
                     yield packet('delta',text=answer)
@@ -416,7 +418,7 @@ def create_app(test_config=None):
                     db().execute('UPDATE conversations SET busy_until=0 WHERE id=?',(cid,));db().commit()
             return app.response_class(events(),mimetype='application/x-ndjson',headers={'X-Accel-Buffering':'no'})
         try:
-            answer=generate(hist,reports,message,knowledge_docs=docs,previous=previous,user_name=profile_name)
+            answer=generate(hist,reports,message,knowledge_docs=docs,previous=previous,user_name=profile_name,time_zone=data.get('time_zone'))
             # Recheck authorization after external generation: a conversation/account may have been deleted.
             if not valid_session() or not owned(cid):return jsonify(erro='Conversa indisponível.'),404
             db().executemany('INSERT INTO messages(conversation,role,content) VALUES(?,?,?)',[(cid,'user',message),(cid,'assistant',answer)])

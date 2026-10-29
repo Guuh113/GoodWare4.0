@@ -19,3 +19,11 @@
 .gw-risk-criteria{margin-top:12px;font-size:12px;color:#b6b6c2}.gw-risk-criteria summary{cursor:pointer;padding:4px 0}
 .gw-risk-unknown .gw-risk-meter{opacity:.35}
 @media(max-width:480px){.gw-risk-panel{padding:16px 12px}.gw-risk-top{gap:6px}.gw-risk-heading{font-size:12px}.gw-risk-badge{font-size:10px}.gw-risk-value{font-size:24px}}
+
+.gw-risk-description{border:1px solid #494951;border-left:4px solid var(--gw-risk-ink);border-radius:10px;padding:16px;margin:18px 0;background:#1a1a20;line-height:1.6}
+.gw-risk-low .gw-risk-description{background:#102a23;border-color:#26745b}
+.gw-risk-attention .gw-risk-description{background:#302817;border-color:#88702b}
+.gw-risk-high .gw-risk-description{background:#321b21;border-color:#95404c}
+.gw-risk-description>strong{color:var(--gw-risk-ink)}
+.gw-risk-description ul{padding-left:20px;margin:12px 0}.gw-risk-description li{margin:10px 0;color:#e0dfe5}
+.gw-risk-description .gw-risk-next{font-weight:600}

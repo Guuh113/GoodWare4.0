@@ -12,9 +12,13 @@
  try{
   await GW.init();$('logout').onclick=()=>action($('logout'),async()=>{await GW.api('/api/auth/logout',{});location.href='login.html';});
   if(page==='painel'){
-   const [stats,records,status,user,intel]=await Promise.all([GW.api('/api/dashboard'),GW.api('/api/historico'),GW.api('/api/status'),GW.api('/api/account'),GW.api('/api/intelligence')]);$('welcome').textContent='Olá, '+user.full_name;GW.showScore($('securityScore'),intel.score);
-   for(const [key,label] of [['analyses','Análises realizadas'],['files','Arquivos inspecionados'],['indicators','Indicadores heurísticos'],['high','Relatórios com risco alto']]){const card=el('div',undefined,'card stat');card.append(el('span',label),el('strong',String(stats[key])));$('stats').append(card);}
-   rows($('recent'),records.slice(0,5));$('modelStatus').textContent=status.llm_configured?'Modelo configurado no servidor.':'O administrador ainda precisa configurar o modelo de linguagem.';
+   const load=async(fn,target)=>{try{await fn();}catch(e){if(target===$('recent'))$('riskSource').textContent='Histórico indisponível. Use Tentar novamente abaixo para carregar o resultado.';target.replaceChildren(el('p','Não foi possível carregar: '+e.message,'notice error'));const retry=el('button','Tentar novamente','secondary');retry.onclick=()=>action(retry,()=>load(fn,target));target.append(retry);}};
+   await Promise.allSettled([
+    load(async()=>{const records=await GW.api('/api/historico');rows($('recent'),records.slice(0,5));if(records.length){const latest=records[0];$('riskSource').textContent=latest.alvo+' · '+new Date(latest.data).toLocaleString('pt-BR');$('dashboardMeter').replaceChildren(GW.riskIndicator(latest),link('Ver evidências deste resultado →','achado.html?id='+encodeURIComponent(latest.id),'secondary'));}else{$('riskSource').textContent='Você ainda não realizou análises. Envie um arquivo ou inspecione um endereço para começar.';}},$('recent')),
+    load(async()=>{const stats=await GW.api('/api/dashboard');$('stats').replaceChildren();for(const [key,label] of [['analyses','Análises realizadas'],['files','Arquivos inspecionados'],['indicators','Indicadores heurísticos'],['high','Relatórios com risco alto']]){const card=el('div',undefined,'card stat');card.append(el('span',label),el('strong',String(stats[key])));$('stats').append(card);}},$('stats')),
+    load(async()=>{const status=await GW.api('/api/status');$('modelStatus').textContent=status.llm_configured?'Aegis disponível para conversar.':'A Aegis aguarda configuração do modelo no servidor.';},$('modelStatus')),
+    GW.api('/api/account').then(user=>{$('welcome').textContent='Olá, '+(user.full_name||'bem-vindo').split(' ')[0];}).catch(()=>{})
+   ]);
   }
   if(page==='historico'){const records=await GW.api('/api/historico');const update=()=>{const q=$('filter').value.toLowerCase(),date=$('historyDate').value,risk=$('historyRisk').value;rows($('history'),records.filter(r=>(r.alvo+' '+(r.sha256||'')).toLowerCase().includes(q)&&(!date||r.data.slice(0,10)>=date)&&(!risk||r.risco===risk)),true);};['filter','historyDate','historyRisk'].forEach(id=>$(id).oninput=update);update();}
   if(page==='achado'){const id=new URLSearchParams(location.search).get('id');if(!id)throw new Error('Escolha um relatório no histórico.');$('report').append(reportCard(await GW.api('/api/reports/'+encodeURIComponent(id))));}
@@ -27,6 +31,7 @@
    $('scanURL').onclick=()=>action($('scanURL'),async()=>{tell('Inspecionando endereço…');await conversation();const d=await GW.api('/api/analisar-url',{url:$('url').value,conversation_id:cid});$('results').append(reportCard(d.resultado));tell('Inspeção sintática concluída.');});
   }
   if(page==='aegis'){
+   GW.api('/api/status').then(status=>{$('webSearchControl').hidden=!status.web_search_available;}).catch(()=>{});
    let cid=null,busy=false,cooldownUntil=0,cooldownTimer=null;const params=new URLSearchParams(location.search);let selected=params.get('report')||'';
    // Um HTTP 429 local significa que o limite de mensagens por minuto foi excedido.
    // Bloquear novas tentativas por um intervalo ajuda a evitar rajadas de solicitações.
@@ -43,7 +48,7 @@
     updateSendButton();
    }
    function isRateLimitError(error){return /429|muitas solicitações|too many requests|rate limit|limite de requisições/i.test(String(error?.message||''));}
-   function message(text,role='assistant'){const box=el('div',undefined,'chat-message '+role);box.append(el('strong',role==='user'?'VOCÊ':'AEGIS AI','author'));const content=el('div',undefined,'message-body');GW.markdown(content,text);box.append(content);$('messages').append(box);$('messages').scrollTop=$('messages').scrollHeight;return box;}
+   function message(text,role='assistant'){const box=el('div',undefined,'chat-message '+role);box.append(el('strong',role==='user'?'VOCÊ':'AEGIS IA','author'));const content=el('div',undefined,'message-body');GW.markdown(content,text);box.append(content);$('messages').append(box);$('messages').scrollTop=$('messages').scrollHeight;return box;}
    function pending(value){busy=value;document.querySelectorAll('.chat-layout button,.chat-layout select').forEach(n=>n.disabled=value);$('message').disabled=value;updateSendButton();}
    async function list(){const items=await GW.api('/api/conversations');$('conversationList').replaceChildren();for(const c of items){const b=el('button',c.title||'Nova conversa',c.id===cid?'active':'');b.onclick=()=>{if(!busy)action(b,()=>load(c.id));};$('conversationList').append(b);}return items;}
    async function load(id){pending(true);try{const data=await GW.api('/api/conversations/'+id);cid=id;history.replaceState(null,'','aegis.html?conversation='+encodeURIComponent(cid));$('messages').replaceChildren();data.messages.forEach(m=>message(m.content,m.role));
@@ -62,7 +67,7 @@
     if(cooldownSeconds()){tell(`Limite temporário de mensagens. Aguarde ${cooldownSeconds()} segundos antes de enviar outra.`,true);updateSendButton();return;}
     if(!cid){tell('A conversa ainda está carregando. Tente novamente.',true);return;}
     const text=$('message').value.trim();if(!text)return;pending(true);const userBubble=message(text,'user'),wait=message('Aegis está respondendo…');
-    try{const d=await GW.streamChat({conversation_id:cid,mensagem:text,report_id:selected||null},partial=>{GW.markdown(wait.querySelector('.message-body'),partial);$('messages').scrollTop=$('messages').scrollHeight;});$('notice').hidden=true;$('notice').classList.remove('error');wait.remove();const answer=message(d.resposta);const feedback=el('button','Dar feedback','secondary');feedback.onclick=()=>action(feedback,async()=>{const note=prompt('A resposta foi útil? Descreva sua avaliação (até 1500 caracteres).');if(note){await GW.api('/api/feedback',{content:'Conversa '+cid+': '+note.slice(0,1500)});tell('Feedback registrado para revisão.');}});answer.append(feedback);if(d.sources?.length){const sources=el('small','Fontes recuperadas: ');for(const s of d.sources){const a=link(s.title+' ',s.url);a.target='_blank';a.rel='noopener noreferrer';sources.append(a);}answer.append(sources);}$('message').value='';await list();}
+    try{const d=await GW.streamChat({conversation_id:cid,mensagem:text,report_id:selected||null,web_search:$('webSearch').checked},partial=>{GW.markdown(wait.querySelector('.message-body'),partial);$('messages').scrollTop=$('messages').scrollHeight;});$('notice').hidden=true;$('notice').classList.remove('error');wait.remove();const answer=message(d.resposta);const feedback=el('button','Avaliar resposta','secondary');feedback.onclick=()=>action(feedback,async()=>{const note=prompt('A resposta foi útil? Descreva sua avaliação (até 1500 caracteres).');if(note){await GW.api('/api/feedback',{content:'Conversa '+cid+': '+note.slice(0,1500)});tell('Avaliação registrada para revisão.');}});answer.append(feedback);if(d.sources?.length){const sources=el('small','Fontes recuperadas: ');for(const s of d.sources){const a=link(s.title+' ',s.url);a.target='_blank';a.rel='noopener noreferrer';sources.append(a);}answer.append(sources);}$('message').value='';await list();}
     catch(error){
      wait.remove();userBubble.remove();
      if(isRateLimitError(error)){
@@ -76,9 +81,17 @@
   }
   if(page==='perfil'){
    const [user,status]=await Promise.all([GW.api('/api/account'),GW.api('/api/status')]);$('full_name').value=user.full_name;$('memory').checked=user.memory_enabled;$('accountInfo').textContent=user.username+' · '+user.email+ (user.verified?' · E-mail verificado':' · E-mail não verificado');$('serviceInfo').textContent=`${status.database} · IA ${status.llm_configured?'configurada':'não configurada'} · E-mail ${status.mail_configured?'configurado':'não configurado'}`;$('adminLink').hidden=!user.is_admin;
+   async function mfaStatus(){const state=await GW.api('/api/account/mfa');$('mfaStatus').textContent=state.enabled?'Ativada — sua conta exige um segundo fator.':'Ainda não ativada.';$('mfaSetup').hidden=state.enabled;$('mfaDisable').hidden=!state.enabled;}
+   mfaStatus().catch(e=>{$('mfaStatus').textContent=e.message;});
+   const mfaData=()=>({password:$('mfaPassword').value,code:$('mfaCode').value.trim()});
+   $('mfaSetup').onclick=()=>action($('mfaSetup'),async()=>{const d=await GW.api('/api/account/mfa',{...mfaData(),action:'setup'});$('mfaSecret').replaceChildren(el('p',d.message),el('code',d.secret));$('mfaSecret').hidden=false;$('mfaConfirm').hidden=false;});
+   $('mfaConfirm').onclick=()=>action($('mfaConfirm'),async()=>{const d=await GW.api('/api/account/mfa',{...mfaData(),action:'confirm'});$('mfaSecret').replaceChildren();$('mfaSecret').hidden=true;$('mfaConfirm').hidden=true;$('mfaBackups').replaceChildren(el('p',d.message),el('pre',d.backup_codes.join('\n')));$('mfaBackups').hidden=false;$('mfaPassword').value='';$('mfaCode').value='';await mfaStatus();await sessions();});
+   $('mfaDisable').onclick=()=>action($('mfaDisable'),async()=>{const d=await GW.api('/api/account/mfa',mfaData(),'DELETE');$('mfaPassword').value='';$('mfaCode').value='';$('mfaBackups').replaceChildren();$('mfaBackups').hidden=true;tell(d.message);await mfaStatus();await sessions();});
+   async function sessions(){const items=await GW.api('/api/account/sessions');$('sessionList').replaceChildren();for(const item of items){const row=el('div',undefined,'analysis-row'),info=el('div');info.append(el('strong',item.current?'Esta sessão':'Outra sessão'),el('p','Expira em '+new Date(item.expires*1000).toLocaleString('pt-BR'),'muted'));const end=el('button',item.current?'Sair desta sessão':'Encerrar sessão','secondary');end.onclick=()=>action(end,async()=>{await GW.api('/api/account/sessions/'+encodeURIComponent(item.id),{},'DELETE');if(item.current)location.href='login.html';else await sessions();});row.append(info,end);$('sessionList').append(row);}}
+   sessions().catch(e=>{$('sessionList').textContent=e.message;});
    $('clearHistoryForm').onsubmit=e=>{e.preventDefault();if(confirm('Apagar todas as conversas e análises? Esta ação não pode ser desfeita.'))action(e.submitter,async()=>{await GW.api('/api/account/history',{password:$('clearPassword').value},'DELETE');$('memory').checked=false;$('clearPassword').value='';tell('Histórico apagado e memória desativada.');});};
    $('profileForm').onsubmit=e=>{e.preventDefault();action(e.submitter,async()=>{await GW.api('/api/account',{full_name:$('full_name').value,memory_enabled:$('memory').checked},'PATCH');tell('Preferências salvas.');});};
-   $('feedbackForm').onsubmit=e=>{e.preventDefault();action(e.submitter,async()=>{await GW.api('/api/feedback',{content:$('feedback').value});$('feedback').value='';tell('Feedback registrado. Obrigado!');});};
+   $('feedbackForm').onsubmit=e=>{e.preventDefault();action(e.submitter,async()=>{await GW.api('/api/feedback',{content:$('feedback').value});$('feedback').value='';tell('Avaliação registrada. Obrigado!');});};
    $('verifyEmail').onclick=()=>action($('verifyEmail'),async()=>{const d=await GW.api('/api/email/request',{});tell(d.message);});
    $('deleteAccountForm').onsubmit=e=>{e.preventDefault();if(confirm('Excluir definitivamente sua conta e os dados armazenados no banco ativo?'))action(e.submitter,async()=>{await GW.api('/api/account',{password:$('deletePassword').value},'DELETE');location.href='login.html';});};
   }

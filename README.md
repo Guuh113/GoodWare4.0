@@ -162,11 +162,3 @@ A implementação não deve ser apresentada como produto de proteção contínua
 Não implementados: feed externo/reputação, análise dinâmica, agente desktop, scanner do computador em tempo real, classificação de famílias comprovada, sandbox de análise isolada por job, fila/worker, recuperação semântica/embeddings, notificações push e chat simultâneo durante etapas internas do mesmo upload. A inspeção estática é limitada e executada no processo web; não executa o arquivo enviado, mas parsers ainda processam dados não confiáveis. Antes de uso público de maior escala, separe scanners em workers com limites de recursos e rede.
 
 Arquitetura futura do agente desktop: instalação com consentimento, identidade por dispositivo, tokens revogáveis de escopo mínimo, canal TLS de saída, seleção local explícita de arquivos e auditoria. Nenhum comando remoto genérico nem agente foi instalado nesta entrega.
-
-## Reputação de URLs via API SENAI
-
-A tela de análise permite autorizar consulta externa à API SENAI / VirusTotal.
-Configure o endereço HTTPS do serviço Java em `SENAI_API_URL`. Sem essa configuração,
-a inspeção local continua disponível. Consulte [INTEGRACAO_SENAI.md](INTEGRACAO_SENAI.md)
-para o contrato, privacidade, limites e ativação. O código-fonte da API no GitHub
-não equivale a um endpoint hospedado.

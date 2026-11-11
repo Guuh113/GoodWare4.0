@@ -23,13 +23,12 @@
   if(page==='historico'){const records=await GW.api('/api/historico');const update=()=>{const q=$('filter').value.toLowerCase(),date=$('historyDate').value,risk=$('historyRisk').value;rows($('history'),records.filter(r=>(r.alvo+' '+(r.sha256||'')).toLowerCase().includes(q)&&(!date||r.data.slice(0,10)>=date)&&(!risk||r.risco===risk)),true);};['filter','historyDate','historyRisk'].forEach(id=>$(id).oninput=update);update();}
   if(page==='achado'){const id=new URLSearchParams(location.search).get('id');if(!id)throw new Error('Escolha um relatório no histórico.');$('report').append(reportCard(await GW.api('/api/reports/'+encodeURIComponent(id))));}
   if(page==='analisar'){
-   GW.api('/api/status').then(status=>{$('urlReputation').disabled=!status.url_reputation_configured;$('urlReputationStatus').textContent=status.url_reputation_configured?'Consulta externa disponível. Ative a opção para autorizar o envio.':'Consulta externa ainda não configurada. A inspeção local continua disponível.';}).catch(()=>{$('urlReputationStatus').textContent='Não foi possível verificar a consulta externa. A inspeção local continua disponível.';});
    let cid=null;const conversation=async()=>cid||(cid=(await GW.api('/api/conversations',{})).id);
    $('scanFiles').onclick=()=>action($('scanFiles'),async()=>{const files=[...$('files').files,...$('folder').files];if(!files.length)throw new Error('Selecione arquivos ou uma pasta.');tell('Preparando envio. Os arquivos não serão executados.');await conversation();let count=0,errors=[];
     for(const file of files){tell('Enviando e inspecionando: '+file.name+' · '+count+' concluído(s)');try{const data=new FormData();data.append('file',file,file.webkitRelativePath||file.name);data.append('conversation_id',cid);const d=await GW.api('/api/analisar-ficheiro',data);$('results').append(reportCard(d.resultado));count++;}catch(e){errors.push(file.name+': '+e.message);}}
     tell(`${count} análise(s) concluída(s).`+(errors.length?'\n'+errors.join('\n'):''),!!errors.length);
    });
-   $('scanURL').onclick=()=>action($('scanURL'),async()=>{tell('Inspecionando endereço…');await conversation();const d=await GW.api('/api/analisar-url',{url:$('url').value,conversation_id:cid,consultar_reputacao:$('urlReputation').checked});$('results').append(reportCard(d.resultado));tell(d.resultado.reputacao?.detalhe||'Inspeção sintática concluída.');});
+   $('scanURL').onclick=()=>action($('scanURL'),async()=>{tell('Inspecionando endereço…');await conversation();const d=await GW.api('/api/analisar-url',{url:$('url').value,conversation_id:cid});$('results').append(reportCard(d.resultado));tell('Inspeção sintática concluída.');});
   }
   if(page==='aegis'){
    GW.api('/api/status').then(status=>{$('webSearchControl').hidden=!status.web_search_available;}).catch(()=>{});

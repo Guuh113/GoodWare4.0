@@ -159,6 +159,12 @@ O primeiro comando apenas conta. O segundo remove relatórios datados, feedback 
 
 A implementação não deve ser apresentada como produto de proteção contínua validado. Faltam: modelo de IA e SMTP reais configurados/testados, PostgreSQL remoto, build Docker e deploy com URL verificada, QA visual desktop/mobile, teste de carga e restauração. O streaming foi testado com fixtures; precisa de teste com o provedor escolhido. O status de IA significa configuração presente, não teste de saúde.
 
-Não implementados: feed externo/reputação, análise dinâmica, agente desktop, scanner do computador em tempo real, classificação de famílias comprovada, sandbox de análise isolada por job, fila/worker, recuperação semântica/embeddings, notificações push e chat simultâneo durante etapas internas do mesmo upload. A inspeção estática é limitada e executada no processo web; não executa o arquivo enviado, mas parsers ainda processam dados não confiáveis. Antes de uso público de maior escala, separe scanners em workers com limites de recursos e rede.
+Não implementados: feed contínuo de ameaças, análise dinâmica, agente desktop, scanner do computador em tempo real, classificação de famílias comprovada, sandbox de análise isolada por job, fila/worker, recuperação semântica/embeddings, notificações push e chat simultâneo durante etapas internas do mesmo upload. A inspeção estática é limitada e executada no processo web; não executa o arquivo enviado, mas parsers ainda processam dados não confiáveis. Antes de uso público de maior escala, separe scanners em workers com limites de recursos e rede.
 
 Arquitetura futura do agente desktop: instalação com consentimento, identidade por dispositivo, tokens revogáveis de escopo mínimo, canal TLS de saída, seleção local explícita de arquivos e auditoria. Nenhum comando remoto genérico nem agente foi instalado nesta entrega.
+
+## Reputação via VirusTotal v3
+
+Consulta direta de URLs e SHA-256 de arquivos, mediante consentimento.
+Configure `VIRUSTOTAL_API_KEY` somente no servidor. Consulte
+[INTEGRACAO_VIRUSTOTAL.md](INTEGRACAO_VIRUSTOTAL.md).

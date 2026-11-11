@@ -17,6 +17,7 @@ import pyotp
 import mailer
 import knowledge
 import intelligence
+import url_reputation
 from reports_pdf import render_pdf
 from assistant_service import generate, AssistantUnavailable, search_web, web_search_available
 
@@ -278,7 +279,7 @@ def create_app(test_config=None):
         return jsonify(analyses=len(records),files=sum(len(r.get('arquivos',[])) for r in records),indicators=sum(len(r['evidencias']) for r in records),high=sum(r.get('risco')=='alto' for r in records))
     @app.get('/api/status')
     @login_required
-    def service_status():return jsonify(web_search_available=web_search_available(),llm_configured=bool(os.getenv('LLM_BASE_URL') and os.getenv('LLM_MODEL')),mail_configured=mailer.configured(),database='PostgreSQL' if engine.dialect.name=='postgresql' else 'SQLite (desenvolvimento)')
+    def service_status():return jsonify(url_reputation_configured=url_reputation.configured(),web_search_available=web_search_available(),llm_configured=bool(os.getenv('LLM_BASE_URL') and os.getenv('LLM_MODEL')),mail_configured=mailer.configured(),database='PostgreSQL' if engine.dialect.name=='postgresql' else 'SQLite (desenvolvimento)')
     @app.get('/api/admin')
     @login_required
     def admin():
@@ -420,6 +421,8 @@ def create_app(test_config=None):
                classificacao='Inspeção sintática',tipo_ameaca='Tipo de ameaça ainda não determinado',pontuacao_modelo=None,
                evidencias=[dict(id=f'E{i+1}',titulo=w,arquivo=value,localizacao={'componente':'URL'},justificativa='Padrão sintático; não confirma phishing.',natureza='suspeita heurística') for i,w in enumerate(warnings)],
                explicacao='URL não acessada. Inspeção apenas sintática; não avalia reputação ou conteúdo.',limitacoes=['Não comprova segurança ou infecção.'])
+        if data.get('consultar_reputacao') is True:
+            url_reputation.enrich(r)
         return save_report(r,cid)
     @app.post('/api/chat')
     @login_required

@@ -112,6 +112,7 @@ window.GW = {
     box.append(this.el('p',r.classificacao));
     box.append(this.riskIndicator(r));
     for(const key of ['tipo_ameaca','explicacao','confianca','impacto','recomendacao'])if(r[key])box.append(this.el('p',r[key]));
+    if(r.reputacao){const rep=this.el('section',undefined,'callout');rep.append(this.el('strong','Reputação externa — '+r.reputacao.fonte),this.el('p',r.reputacao.detalhe));if(typeof r.reputacao.percentual_motores==='number')rep.append(this.el('p',r.reputacao.percentual_motores+'% dos motores sinalizaram. Esse percentual não é a probabilidade de infecção nem a nota do medidor.'));rep.append(this.el('small','Consulta: '+new Date(r.reputacao.consultado_em).toLocaleString('pt-BR')));box.append(rep);}
     if(r.sha256)box.append(this.el('p','SHA-256: '+r.sha256));
     box.append(this.el('p','Pontuação do modelo (não calibrada): '+(r.pontuacao_modelo==null?'indisponível':r.pontuacao_modelo+' / 100')));
     for(const e of r.evidencias||[]) {

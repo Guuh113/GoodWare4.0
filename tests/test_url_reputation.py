@@ -134,6 +134,8 @@ def test_file_consent_hash_only_persistence(tmp_path, monkeypatch):
     assert len(calls)==1 and calls[0].full_url.endswith('/files/'+digest)
     assert calls[0].data is None and 'hello' not in calls[0].full_url
     assert result['reputacao']['motores_sinalizaram']==1
+    assert result['classificacao']=='Sinalização externa — requer investigação'
+    assert not any('não verifica assinatura digital ou reputação externa' in item for item in result['limitacoes'])
     assert a.get('/api/reports/'+result['id']).json['reputacao']==result['reputacao']
 
 

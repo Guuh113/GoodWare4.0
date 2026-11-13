@@ -97,6 +97,8 @@ def enrich(report):
     is_file = report.get('tipo') == 'FICHEIRO'
     result = lookup(report['sha256'], 'file') if is_file else lookup(report['alvo'])
     report['reputacao'] = result
+    if is_file:
+        report['limitacoes'] = [item.replace(' ou reputação externa', '') for item in report.get('limitacoes', [])]
     report['explicacao'] += ' ' + result['detalhe']
     report['limitacoes'].append('A consulta externa usa resultados já existentes no VirusTotal; não inicia nova varredura. Os resultados podem estar desatualizados. Arquivos são consultados somente pelo SHA-256, sem envio do conteúdo.')
     if result['estado'] == 'consultado':
@@ -104,6 +106,7 @@ def enrich(report):
             report['classificacao'] = 'Inspeção sintática e consulta de reputação'
         # Preserve local analysis and explanation alongside external evidence.
         if result['motores_sinalizaram']:
+            report['classificacao'] = 'Sinalização externa — requer investigação'
             report['evidencias'].append({
                 'id': 'E' + str(len(report['evidencias']) + 1),
                 'categoria': 'reputacao_externa', 'titulo': 'Item sinalizado por motores externos',

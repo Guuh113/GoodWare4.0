@@ -10,7 +10,9 @@
    if(allowDelete){const b=el('button','Excluir','danger');b.onclick=()=>{if(confirm('Excluir este relatório? Mensagens que já o citam serão preservadas.'))action(b,async()=>{await GW.api('/api/reports/'+r.id,{},'DELETE');location.reload();});};actions.append(b);}if(r.conversation_id)actions.append(link('Conversa vinculada','aegis.html?conversation='+encodeURIComponent(r.conversation_id)));row.append(info,actions);target.append(row);}
  }
  try{
-  if(page!=='painel')await GW.init();$('logout').onclick=()=>action($('logout'),async()=>{await GW.api('/api/auth/logout',{});location.href='login.html';});
+  const initialURLs={historico:['/api/historico'],perfil:['/api/account','/api/status'],analisar:['/api/status']};
+  const initial=initialURLs[page]?await GW.loadPage(initialURLs[page],page==='analisar'?['/api/status']:[]):[];
+  if(page!=='painel'&&!initialURLs[page])await GW.init();$('logout').onclick=()=>action($('logout'),async()=>{await GW.api('/api/auth/logout',{});location.href='login.html';});
   if(page==='painel'){
    const load=async()=>{
     $('riskSource').textContent='Carregando seu último resultado…';
@@ -30,10 +32,10 @@
    };
    await load();
   }
-  if(page==='historico'){const records=await GW.api('/api/historico');const update=()=>{const q=$('filter').value.toLowerCase(),date=$('historyDate').value,risk=$('historyRisk').value;rows($('history'),records.filter(r=>(r.alvo+' '+(r.sha256||'')).toLowerCase().includes(q)&&(!date||r.data.slice(0,10)>=date)&&(!risk||r.risco===risk)),true);};['filter','historyDate','historyRisk'].forEach(id=>$(id).oninput=update);update();}
+  if(page==='historico'){const records=initial[0];const update=()=>{const q=$('filter').value.toLowerCase(),date=$('historyDate').value,risk=$('historyRisk').value;rows($('history'),records.filter(r=>(r.alvo+' '+(r.sha256||'')).toLowerCase().includes(q)&&(!date||r.data.slice(0,10)>=date)&&(!risk||r.risco===risk)),true);};['filter','historyDate','historyRisk'].forEach(id=>$(id).oninput=update);update();}
   if(page==='achado'){const id=new URLSearchParams(location.search).get('id');if(!id)throw new Error('Escolha um relatório no histórico.');$('report').append(reportCard(await GW.api('/api/reports/'+encodeURIComponent(id))));}
   if(page==='analisar'){
-   GW.api('/api/status').then(status=>{$('urlReputation').disabled=!status.url_reputation_configured;$('fileReputation').disabled=!status.url_reputation_configured;$('urlReputationStatus').textContent=status.url_reputation_configured?'Consulta externa disponível. Ative a opção para autorizar o envio.':'Consulta externa ainda não configurada. A inspeção local continua disponível.';}).catch(()=>{$('urlReputationStatus').textContent='Não foi possível verificar a consulta externa. A inspeção local continua disponível.';});
+   Promise.resolve(initial[0]).then(status=>{$('urlReputation').disabled=!status.url_reputation_configured;$('fileReputation').disabled=!status.url_reputation_configured;$('urlReputationStatus').textContent=status.url_reputation_configured?'Consulta externa disponível. Ative a opção para autorizar o envio.':'Consulta externa ainda não configurada. A inspeção local continua disponível.';}).catch(()=>{$('urlReputationStatus').textContent='Não foi possível verificar a consulta externa. A inspeção local continua disponível.';});
    let cid=null;const conversation=async()=>cid||(cid=(await GW.api('/api/conversations',{})).id);
    $('scanFiles').onclick=()=>action($('scanFiles'),async()=>{const files=[...$('files').files,...$('folder').files];if(!files.length)throw new Error('Selecione arquivos ou uma pasta.');tell('Preparando envio. Os arquivos não serão executados.');await conversation();let count=0,errors=[];
     for(const file of files){tell('Enviando e inspecionando: '+file.name+' · '+count+' concluído(s)');try{const data=new FormData();data.append('file',file,file.webkitRelativePath||file.name);data.append('conversation_id',cid);data.append('consultar_reputacao',String($('fileReputation').checked));const d=await GW.api('/api/analisar-ficheiro',data);$('results').append(reportCard(d.resultado));count++;}catch(e){errors.push(file.name+': '+e.message);}}
@@ -91,7 +93,7 @@
    const all=await list(),requested=params.get('conversation');if(requested)await load(requested);else if(selected){const c=await GW.api('/api/conversations',{report_id:selected});await load(c.id);}else if(all.length)await load(all[0].id);else await newChat();if(params.get('prompt'))$('message').value=params.get('prompt').slice(0,4000);
   }
   if(page==='perfil'){
-   const [user,status]=await Promise.all([GW.api('/api/account'),GW.api('/api/status')]);$('full_name').value=user.full_name;$('memory').checked=user.memory_enabled;$('accountInfo').textContent=user.username+' · '+user.email+ (user.verified?' · E-mail verificado':' · E-mail não verificado');$('serviceInfo').textContent=`${status.database} · IA ${status.llm_configured?'configurada':'não configurada'} · E-mail ${status.mail_configured?'configurado':'não configurado'}`;$('adminLink').hidden=!user.is_admin;
+   const [user,status]=initial;$('full_name').value=user.full_name;$('memory').checked=user.memory_enabled;$('accountInfo').textContent=user.username+' · '+user.email+ (user.verified?' · E-mail verificado':' · E-mail não verificado');$('serviceInfo').textContent=`${status.database} · IA ${status.llm_configured?'configurada':'não configurada'} · E-mail ${status.mail_configured?'configurado':'não configurado'}`;$('adminLink').hidden=!user.is_admin;
    async function mfaStatus(){const state=await GW.api('/api/account/mfa');$('mfaStatus').textContent=state.enabled?'Ativada — sua conta exige um segundo fator.':'Ainda não ativada.';$('mfaSetup').hidden=state.enabled;$('mfaDisable').hidden=!state.enabled;}
    mfaStatus().catch(e=>{$('mfaStatus').textContent=e.message;});
    const mfaData=()=>({password:$('mfaPassword').value,code:$('mfaCode').value.trim()});

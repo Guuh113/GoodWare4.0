@@ -9,6 +9,17 @@ from test_goodware import account, conv
 URL = 'https://example.com/'
 
 
+@pytest.fixture(autouse=True)
+def clear_reputation_cache():
+    rep._cache.clear()
+    rep._cooldowns.clear()
+    rep._inflight.clear()
+    yield
+    rep._cache.clear()
+    rep._cooldowns.clear()
+    rep._inflight.clear()
+
+
 def stub(monkeypatch, threats=5, total=100, **changes):
     monkeypatch.setenv('VIRUSTOTAL_API_KEY', 'test-only-key')
     calls = []
@@ -141,3 +152,62 @@ def test_file_consent_hash_only_persistence(tmp_path, monkeypatch):
 
 def test_redirects_not_followed():
     assert rep.NoRedirect().redirect_request(None,None,302,'',{},'https://other.example') is None
+
+
+def test_cache_reuse_expiry_and_key_rotation(monkeypatch):
+    calls=stub(monkeypatch)
+    clock=[1000]
+    monkeypatch.setattr(rep.time,'monotonic',lambda:clock[0])
+    first=rep.lookup(URL)
+    again=rep.lookup(URL)
+    assert len(calls)==1 and again['reutilizado'] is True
+    assert again['consultado_em']==first['consultado_em']
+    again['motores_sinalizaram']=999
+    assert rep.lookup(URL)['motores_sinalizaram']==5
+    clock[0]+=301
+    assert not rep.lookup(URL).get('reutilizado') and len(calls)==2
+    monkeypatch.setenv('VIRUSTOTAL_API_KEY','different-key')
+    rep.lookup(URL)
+    assert len(calls)==3
+    assert URL not in str(rep._cache.keys()) and 'different-key' not in str(rep._cache.keys())
+
+
+def test_cache_is_bounded(monkeypatch):
+    stub(monkeypatch)
+    for i in range(140):rep.lookup(URL+str(i))
+    assert len(rep._cache)==128
+
+
+def test_errors_are_not_cached_but_quota_has_cooldown(monkeypatch):
+    calls=stub(monkeypatch)
+    class Client:
+        def open(self,*a,**k):
+            calls.append('error')
+            raise HTTPError('https://www.virustotal.com',429,'quota',{},None)
+    monkeypatch.setattr(rep,'build_opener',lambda *a:Client())
+    assert rep.lookup(URL)['estado']=='limite_excedido'
+    assert rep.lookup(URL+'other')['estado']=='limite_excedido'
+    assert len(calls)==1 and not rep._cache
+    rep._cooldowns.clear()
+    assert rep.lookup(URL)['estado']=='limite_excedido' and len(calls)==2
+
+
+def test_concurrent_duplicate_does_not_block_local_result(monkeypatch):
+    import threading
+    started,release=threading.Event(),threading.Event()
+    original=rep._lookup_remote
+    stub(monkeypatch)
+    def slow(value,kind):
+        started.set()
+        assert release.wait(2)
+        return original(value,kind)
+    monkeypatch.setattr(rep,'_lookup_remote',slow)
+    thread=threading.Thread(target=lambda:rep.lookup(URL))
+    thread.start()
+    try:
+        assert started.wait(2)
+        assert rep.lookup(URL)['estado']=='ocupado'
+    finally:
+        release.set();thread.join(2)
+    assert not rep._inflight
+    assert rep.lookup(URL)['reutilizado']

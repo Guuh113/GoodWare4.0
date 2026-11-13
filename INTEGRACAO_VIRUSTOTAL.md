@@ -43,3 +43,17 @@ categoria, +10 por categoria distinta, teto 85. Reputação indisponível/contag
 inválidas não reduzem a nota local. Ausência de dados não indica segurança.
 O relatório mantém contagens, datas, critérios e versão. Relatórios anteriores
 preservam o cálculo original; faça nova análise para usar a versão atual.
+
+## Consultas repetidas e limites
+
+O servidor reutiliza resultados válidos por até 5 minutos (até 128 itens por
+processo). Resultados sem dados ou não encontrados duram 60 segundos. A interface
+informa o reaproveitamento e mantém a data da consulta original. O cache não guarda
+arquivos nem URLs como chaves; usa hashes e não é persistido em disco.
+A autorização de consulta continua obrigatória mesmo quando existe cache.
+Falhas não são armazenadas como resultados limpos. Após HTTP 429, consultas novas
+aguardam 60 segundos; a análise local continua. No máximo duas consultas externas
+ocorrem ao mesmo tempo por processo; duplicatas em andamento recebem aviso para
+repetir depois. Não há fila persistente nem promessa de processamento posterior.
+Em vários workers, os limites/cache são independentes; isso não substitui a cota
+global do provedor. Não aumente workers para contornar limites.

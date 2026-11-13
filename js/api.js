@@ -26,6 +26,7 @@ window.GW = {
     if(!response.ok) {
       if(response.status===401 && !url.startsWith('/api/auth/')) location.href='login.html';
       const error=new Error(typeof data.erro==='string'?data.erro:'Solicitação não concluída (HTTP '+response.status+').');
+      if(typeof data.request_id==='string'&&/^[a-f0-9]{16}$/.test(data.request_id))error.message+=' Código: '+data.request_id+'.';
       error.status=response.status;throw error;
     }
     return data;
@@ -36,6 +37,11 @@ window.GW = {
     if(typeof d.csrf!=='string'||!d.csrf||typeof d.authenticated!=='boolean') throw new Error('A sessão retornada não é válida. '+this.backendHint);
     this.csrf=d.csrf;
     if(required&&!d.authenticated){location.href='login.html';throw new Error('Entre na sua conta.');}return d;
+  },
+  async loadPage(urls, optionalURLs=[]) {
+    // Start independent reads together; never render until authentication succeeds.
+    const results=await Promise.all([this.init(),...urls.map(url=>this.api(url).catch(error=>{if(optionalURLs.includes(url))return null;throw error;}))]);
+    return results.slice(1);
   },
   timeZone() { try {return Intl.DateTimeFormat().resolvedOptions().timeZone||'America/Sao_Paulo';} catch {return 'America/Sao_Paulo';} },
   async api(url, data, method) {
@@ -115,7 +121,7 @@ window.GW = {
     box.append(this.el('p',r.classificacao));
     box.append(this.riskIndicator(r));
     for(const key of ['tipo_ameaca','explicacao','confianca','impacto','recomendacao'])if(r[key])box.append(this.el('p',r[key]));
-    if(r.reputacao){const rep=this.el('section',undefined,'callout');rep.append(this.el('strong','Reputação externa — '+r.reputacao.fonte),this.el('p',r.reputacao.detalhe));if(typeof r.reputacao.percentual_motores==='number')rep.append(this.el('p',r.reputacao.percentual_motores+'% dos motores sinalizaram. Esse percentual não é a probabilidade de infecção nem a nota do medidor.'));if(r.reputacao.analisado_em)rep.append(this.el('p','Última análise no VirusTotal: '+new Date(r.reputacao.analisado_em).toLocaleString('pt-BR')));else rep.append(this.el('p','Data da análise original indisponível.'));rep.append(this.el('small','Consulta: '+new Date(r.reputacao.consultado_em).toLocaleString('pt-BR')));box.append(rep);}
+    if(r.reputacao){const rep=this.el('section',undefined,'callout');rep.append(this.el('strong','Reputação externa — '+r.reputacao.fonte),this.el('p',r.reputacao.detalhe));if(typeof r.reputacao.percentual_motores==='number')rep.append(this.el('p',r.reputacao.percentual_motores+'% dos motores sinalizaram. Esse percentual não é a probabilidade de infecção nem a nota do medidor.'));if(r.reputacao.analisado_em)rep.append(this.el('p','Última análise no VirusTotal: '+new Date(r.reputacao.analisado_em).toLocaleString('pt-BR')));else rep.append(this.el('p','Data da análise original indisponível.'));if(r.reputacao.consultado_em)rep.append(this.el('small','Consulta: '+new Date(r.reputacao.consultado_em).toLocaleString('pt-BR')));if(r.reputacao.reutilizado)rep.append(this.el('small','Resultado recente reutilizado por até 5 minutos; não foi feita outra consulta ao provedor.'));box.append(rep);}
     if(r.sha256)box.append(this.el('p','SHA-256: '+r.sha256));
     box.append(this.el('p','Pontuação do modelo (não calibrada): '+(r.pontuacao_modelo==null?'indisponível':r.pontuacao_modelo+' / 100')));
     for(const e of r.evidencias||[]) {

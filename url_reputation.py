@@ -4,6 +4,10 @@ import re
 import ipaddress
 import json
 import os
+import hashlib
+import time
+import threading
+from collections import OrderedDict
 from datetime import datetime, timezone
 from urllib.error import HTTPError, URLError
 from urllib.parse import urlsplit
@@ -37,7 +41,7 @@ def shareable(value):
         return False
 
 
-def lookup(value, kind='url'):
+def _lookup_remote(value, kind='url'):
     result = {'fonte': 'VirusTotal API v3',
               'consultado_em': datetime.now(timezone.utc).isoformat()}
     if not configured():
@@ -91,6 +95,58 @@ def lookup(value, kind='url'):
         'acesso_negado': 'O VirusTotal não autorizou esta consulta. Verifique as permissões da conta.',
     }
     return dict(result, estado=state, detalhe=messages.get(state, 'VirusTotal indisponível no momento.') + ' A análise local foi preservada; isso não significa que o item seja seguro.')
+
+
+# Bounded, process-local cache. No URLs, file contents or API keys are retained as keys.
+_cache = OrderedDict()
+_cache_lock = threading.Lock()
+_inflight = set()
+_cooldowns = {}
+CACHE_SECONDS = 300
+CACHE_LIMIT = 128
+
+
+def lookup(value, kind='url'):
+    key_value = os.getenv('VIRUSTOTAL_API_KEY', '').strip()
+    allowed = (kind == 'url' and isinstance(value, str) and shareable(value)) or (kind == 'file' and isinstance(value, str) and re.fullmatch(r'[a-f0-9]{64}', value))
+    if not key_value or not allowed:
+        return _lookup_remote(value, kind)
+    credential = hashlib.sha256(key_value.encode()).hexdigest()
+    key = hashlib.sha256((credential + ':' + kind + ':' + value).encode()).hexdigest()
+    now = time.monotonic()
+    with _cache_lock:
+        for old in [k for k, (expires, _) in _cache.items() if expires <= now]:
+            del _cache[old]
+        for old in [k for k, expires in _cooldowns.items() if expires <= now]:
+            del _cooldowns[old]
+        if key in _cache:
+            _cache.move_to_end(key)
+            return dict(_cache[key][1], reutilizado=True)
+        state = None
+        if _cooldowns.get(credential, 0) > now:
+            state = 'limite_excedido'
+        elif key in _inflight or len(_inflight) >= 2:
+            state = 'ocupado'
+        if state:
+            return {'fonte': 'VirusTotal API v3', 'consultado_em': None, 'estado': state,
+                    'detalhe': ('Consultas externas temporariamente em espera após limite do provedor.' if state == 'limite_excedido' else 'Há consultas externas em andamento. Tente novamente em instantes.') + ' A análise local foi preservada; isso não indica segurança.'}
+        _inflight.add(key)
+    try:
+        result = _lookup_remote(value, kind)
+        with _cache_lock:
+            if result['estado'] in ('consultado', 'sem_dados', 'nao_encontrado'):
+                ttl = CACHE_SECONDS if result['estado'] == 'consultado' else 60
+                _cache[key] = (time.monotonic() + ttl, dict(result))
+                while len(_cache) > CACHE_LIMIT:
+                    _cache.popitem(last=False)
+            elif result['estado'] == 'limite_excedido':
+                if len(_cooldowns) >= CACHE_LIMIT:
+                    _cooldowns.pop(next(iter(_cooldowns)))
+                _cooldowns[credential] = time.monotonic() + 60
+        return result
+    finally:
+        with _cache_lock:
+            _inflight.discard(key)
 
 
 def enrich(report):

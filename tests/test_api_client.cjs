@@ -16,3 +16,21 @@ test('credenciais inválidas preservam mensagem no login',async()=>{const {gw,co
 test('arquivo HTML aberto diretamente é rejeitado',async()=>{const {gw,context}=setup(async()=>{throw new Error('não deve chamar')});context.location.protocol='file:';await assert.rejects(gw.init(false),/INICIAR_GOODWARE/);});
 
 test('site hospedado não orienta executar arquivos locais',async()=>{const {gw,context}=setup(async()=>{throw new TypeError('fetch failed')});context.location.hostname='goodware-i8y9.onrender.com';await assert.rejects(gw.init(false),e=>e.message.includes('hospedagem')&&!e.message.includes('INICIAR_GOODWARE'));});
+
+test('telas iniciam leituras em paralelo e aguardam autenticação',async()=>{
+  const calls=[],resolve={};const {gw}=setup(url=>{calls.push(url);return new Promise(r=>resolve[url]=r);});
+  const pending=gw.loadPage(['/api/account','/api/status']);
+  assert.deepEqual(calls,['/api/auth/session','/api/account','/api/status']);
+  resolve['/api/account'](response('{"full_name":"Teste"}'));
+  resolve['/api/status'](response('{"mail_configured":false}'));
+  resolve['/api/auth/session'](response('{"csrf":"token","authenticated":true}'));
+  const data=await pending;assert.equal(data[0].full_name,'Teste');assert.equal(gw.csrf,'token');
+});
+test('leituras paralelas não liberam tela sem autenticação',async()=>{
+ const {gw,context}=setup(async url=>response(JSON.stringify(url.endsWith('/session')?{csrf:'token',authenticated:false}:{})));
+ await assert.rejects(gw.loadPage(['/api/account']),/Entre na sua conta/);assert.equal(context.location.href,'login.html');
+});
+test('falha opcional de status preserva acesso à análise local',async()=>{
+ const {gw}=setup(async url=>url.endsWith('/session')?response('{"csrf":"token","authenticated":true}'):response('{"erro":"Indisponível"}',503));
+ const result=await gw.loadPage(['/api/status'],['/api/status']);assert.equal(result[0],null);assert.equal(gw.csrf,'token');
+});

@@ -88,7 +88,7 @@ def create_app(test_config=None):
         db().execute('INSERT INTO auth_tokens VALUES(?,?,?,?)',(digest(raw),uid,purpose,time.time()+1800))
         mailer.send_token(email,raw,purpose)
     @app.before_request
-    def request_id():g.request_id=secrets.token_hex(8)
+    def request_id():g.request_id=secrets.token_hex(8);g.request_started=time.monotonic()
     @app.before_request
     def rate_limit():
         if not request.path.startswith('/api/'):return None
@@ -309,7 +309,7 @@ def create_app(test_config=None):
     @app.after_request
     def headers(response):
         response.headers['X-Request-ID']=g.get('request_id','')
-        app.logger.info(json.dumps({'event':'http.response','request_id':g.get('request_id'),'route':str(request.url_rule) if request.url_rule else 'unmatched','method':request.method,'status':response.status_code}))
+        app.logger.info(json.dumps({'event':'http.response','request_id':g.get('request_id'),'route':str(request.url_rule) if request.url_rule else 'unmatched','method':request.method,'status':response.status_code,'duration_ms':round((time.monotonic()-g.get('request_started',time.monotonic()))*1000,1)}))
         response.headers['X-Content-Type-Options']='nosniff'
         response.headers['X-Frame-Options']='DENY'
         response.headers['Referrer-Policy']='no-referrer'
@@ -326,7 +326,7 @@ def create_app(test_config=None):
     @app.errorhandler(500)
     def internal_error(error):
         if request.path.startswith('/api/'):
-            return jsonify(erro='Erro interno no servidor. Verifique o terminal do GoodWare e tente novamente.'),500
+            return jsonify(erro='Erro interno no servidor. Tente novamente; se persistir, informe o código da solicitação ao responsável pelo GoodWare.',request_id=g.get('request_id')),500
         return 'Erro interno no servidor.',500
     @app.errorhandler(413)
     def too_large(_):return jsonify(erro='Upload excede 10 MiB (mais limite do formulário).'),413

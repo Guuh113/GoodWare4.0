@@ -14,3 +14,5 @@ test('login só envia após obter CSRF',async()=>{let calls=[];const {gw}=setup(
 test('erro inicial permite tentar novamente',async()=>{let n=0;const {gw}=setup(async()=>response(++n===1?'':JSON.stringify({csrf:'new',authenticated:false})));await assert.rejects(gw.init(false));await gw.init(false);assert.equal(gw.csrf,'new');});
 test('credenciais inválidas preservam mensagem no login',async()=>{const {gw,context}=setup(async()=>response('{"erro":"Credenciais inválidas."}',401));gw.csrf='existing';await assert.rejects(gw.api('/api/auth/login',{}),/Credenciais inválidas/);assert.equal(context.location.href,'');});
 test('arquivo HTML aberto diretamente é rejeitado',async()=>{const {gw,context}=setup(async()=>{throw new Error('não deve chamar')});context.location.protocol='file:';await assert.rejects(gw.init(false),/INICIAR_GOODWARE/);});
+
+test('site hospedado não orienta executar arquivos locais',async()=>{const {gw,context}=setup(async()=>{throw new TypeError('fetch failed')});context.location.hostname='goodware-i8y9.onrender.com';await assert.rejects(gw.init(false),e=>e.message.includes('hospedagem')&&!e.message.includes('INICIAR_GOODWARE'));});

@@ -2,7 +2,10 @@
 window.GW = {
   csrf: '',
   el(tag, text, cls) { const n=document.createElement(tag); if(text!==undefined)n.textContent=text; if(cls)n.className=cls;return n; },
-  backendHint: 'Abra o projeto pelo INICIAR_GOODWARE.bat ou execute python iniciar.py. Use o endereço aberto pelo programa, não o Live Server.',
+  get backendHint() {
+    const local=location.protocol==='file:' || !location.hostname || ['localhost','127.0.0.1','[::1]'].includes(location.hostname);
+    return local?'Abra o projeto pelo INICIAR_GOODWARE.bat ou execute python iniciar.py. Use o endereço aberto pelo programa, não o Live Server.':'A hospedagem pode estar iniciando. Aguarde um pouco e tente novamente. Se persistir, informe o erro ao responsável pelo GoodWare.';
+  },
   async requestJSON(url, opts={}) {
     if(location.protocol === 'file:') throw new Error(this.backendHint);
     const controller=new AbortController();
@@ -18,8 +21,8 @@ window.GW = {
     const type=response.headers.get('Content-Type')||'';
     if(!type.toLowerCase().includes('application/json')) throw new Error('Este endereço não retornou a API do GoodWare (HTTP '+response.status+'). '+this.backendHint);
     let data;
-    try {data=JSON.parse(raw);} catch {throw new Error('O servidor retornou JSON incompleto ou inválido. Reinicie o GoodWare e tente novamente.');}
-    if(data===null || typeof data!=='object') throw new Error('Resposta inesperada do servidor. Reinicie o GoodWare.');
+    try {data=JSON.parse(raw);} catch {throw new Error('O servidor retornou JSON incompleto ou inválido. Recarregue a página e tente novamente.');}
+    if(data===null || typeof data!=='object') throw new Error('Resposta inesperada do servidor. Recarregue a página e tente novamente.');
     if(!response.ok) {
       if(response.status===401 && !url.startsWith('/api/auth/')) location.href='login.html';
       const error=new Error(typeof data.erro==='string'?data.erro:'Solicitação não concluída (HTTP '+response.status+').');

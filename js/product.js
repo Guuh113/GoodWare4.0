@@ -10,15 +10,25 @@
    if(allowDelete){const b=el('button','Excluir','danger');b.onclick=()=>{if(confirm('Excluir este relatório? Mensagens que já o citam serão preservadas.'))action(b,async()=>{await GW.api('/api/reports/'+r.id,{},'DELETE');location.reload();});};actions.append(b);}if(r.conversation_id)actions.append(link('Conversa vinculada','aegis.html?conversation='+encodeURIComponent(r.conversation_id)));row.append(info,actions);target.append(row);}
  }
  try{
-  await GW.init();$('logout').onclick=()=>action($('logout'),async()=>{await GW.api('/api/auth/logout',{});location.href='login.html';});
+  if(page!=='painel')await GW.init();$('logout').onclick=()=>action($('logout'),async()=>{await GW.api('/api/auth/logout',{});location.href='login.html';});
   if(page==='painel'){
-   const load=async(fn,target)=>{try{await fn();}catch(e){if(target===$('recent'))$('riskSource').textContent='Histórico indisponível. Use Tentar novamente abaixo para carregar o resultado.';target.replaceChildren(el('p','Não foi possível carregar: '+e.message,'notice error'));const retry=el('button','Tentar novamente','secondary');retry.onclick=()=>action(retry,()=>load(fn,target));target.append(retry);}};
-   await Promise.allSettled([
-    load(async()=>{const records=await GW.api('/api/historico');rows($('recent'),records.slice(0,5));if(records.length){const latest=records[0];$('riskSource').textContent=latest.alvo+' · '+new Date(latest.data).toLocaleString('pt-BR');$('dashboardMeter').replaceChildren(GW.riskIndicator(latest),link('Ver evidências deste resultado →','achado.html?id='+encodeURIComponent(latest.id),'secondary'));}else{$('riskSource').textContent='Você ainda não realizou análises. Envie um arquivo ou inspecione um endereço para começar.';}},$('recent')),
-    load(async()=>{const stats=await GW.api('/api/dashboard');$('stats').replaceChildren();for(const [key,label] of [['analyses','Análises realizadas'],['files','Arquivos inspecionados'],['indicators','Indicadores heurísticos'],['high','Relatórios com risco alto']]){const card=el('div',undefined,'card stat');card.append(el('span',label),el('strong',String(stats[key])));$('stats').append(card);}},$('stats')),
-    load(async()=>{const status=await GW.api('/api/status');$('modelStatus').textContent=status.llm_configured?'Aegis disponível para conversar.':'A Aegis aguarda configuração do modelo no servidor.';},$('modelStatus')),
-    GW.api('/api/account').then(user=>{$('welcome').textContent='Olá, '+(user.full_name||'bem-vindo').split(' ')[0];}).catch(()=>{})
-   ]);
+   const load=async()=>{
+    $('riskSource').textContent='Carregando seu último resultado…';
+    $('dashboardMeter').setAttribute('aria-busy','true');
+    try{
+     const overview=await GW.api('/api/dashboard/overview');
+     if(!overview.authenticated||!overview.csrf)throw new Error('Sessão inválida. Entre novamente.');
+     $('welcome').textContent='Olá, '+(overview.full_name||'bem-vindo').split(' ')[0];
+     rows($('recent'),overview.recent);
+     const latest=overview.latest;
+     if(latest){$('riskSource').textContent=latest.alvo+' · '+new Date(latest.data).toLocaleString('pt-BR');$('dashboardMeter').replaceChildren(GW.riskIndicator(latest),link('Ver evidências deste resultado →','achado.html?id='+encodeURIComponent(latest.id),'secondary'));}
+     else{$('riskSource').textContent='Você ainda não realizou análises.';$('dashboardMeter').replaceChildren(el('p','Envie um arquivo ou inspecione um endereço para começar.','empty'));}
+     $('stats').replaceChildren();for(const [key,label] of [['analyses','Análises realizadas'],['files','Arquivos inspecionados'],['indicators','Indicadores heurísticos'],['high','Relatórios com risco alto']]){const card=el('div',undefined,'card stat');card.append(el('span',label),el('strong',String(overview.stats[key])));$('stats').append(card);}
+     $('modelStatus').textContent=overview.llm_configured?'Aegis disponível para conversar.':'A Aegis aguarda configuração do modelo no servidor.';
+    }catch(e){$('riskSource').textContent='Não foi possível atualizar o painel.';const retry=el('button','Tentar novamente','secondary');retry.onclick=()=>action(retry,load);$('dashboardMeter').replaceChildren(el('p',e.message,'notice error'),retry);}
+    finally{$('dashboardMeter').setAttribute('aria-busy','false');}
+   };
+   await load();
   }
   if(page==='historico'){const records=await GW.api('/api/historico');const update=()=>{const q=$('filter').value.toLowerCase(),date=$('historyDate').value,risk=$('historyRisk').value;rows($('history'),records.filter(r=>(r.alvo+' '+(r.sha256||'')).toLowerCase().includes(q)&&(!date||r.data.slice(0,10)>=date)&&(!risk||r.risco===risk)),true);};['filter','historyDate','historyRisk'].forEach(id=>$(id).oninput=update);update();}
   if(page==='achado'){const id=new URLSearchParams(location.search).get('id');if(!id)throw new Error('Escolha um relatório no histórico.');$('report').append(reportCard(await GW.api('/api/reports/'+encodeURIComponent(id))));}

@@ -277,6 +277,21 @@ def create_app(test_config=None):
         rows=db().execute('SELECT body FROM reports WHERE owner=?',(session['user'],)).fetchall()
         records=[json.loads(r[0]) for r in rows]
         return jsonify(analyses=len(records),files=sum(len(r.get('arquivos',[])) for r in records),indicators=sum(len(r['evidencias']) for r in records),high=sum(r.get('risco')=='alto' for r in records))
+    @app.get('/api/dashboard/overview')
+    @login_required
+    def dashboard_overview():
+        # One authenticated response replaces five browser requests and two report reads.
+        rows=db().execute('SELECT body,conversation FROM reports WHERE owner=? ORDER BY created_at DESC,id DESC',(session['user'],)).fetchall()
+        records=[json.loads(row[0]) for row in rows]
+        user=db().execute('SELECT full_name FROM users WHERE id=?',(session['user'],)).fetchone()
+        if 'csrf' not in session:session['csrf']=secrets.token_hex(32)
+        recent=[dict((key,record.get(key)) for key in ('id','alvo','data','risco','classificacao')) for record in records[:5]]
+        for item,row in zip(recent,rows):item['conversation_id']=row[1]
+        return jsonify(csrf=session['csrf'],authenticated=True,full_name=user['full_name'] if user else '',
+            latest=records[0] if records else None,recent=recent,
+            stats=dict(analyses=len(records),files=sum(len(r.get('arquivos',[])) for r in records),
+                indicators=sum(len(r.get('evidencias',[])) for r in records),high=sum(r.get('risco')=='alto' for r in records)),
+            llm_configured=bool(os.getenv('LLM_BASE_URL') and os.getenv('LLM_MODEL')))
     @app.get('/api/status')
     @login_required
     def service_status():return jsonify(url_reputation_configured=url_reputation.configured(),web_search_available=web_search_available(),llm_configured=bool(os.getenv('LLM_BASE_URL') and os.getenv('LLM_MODEL')),mail_configured=mailer.configured(),database='PostgreSQL' if engine.dialect.name=='postgresql' else 'SQLite (desenvolvimento)')

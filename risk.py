@@ -15,20 +15,37 @@ def score_model(vector):
         return None,'Modelo indisponível ou incompatível; análise heurística preservada.'
 
 
-def assess_report(report):
-    """Severity index v1: categories, not probabilities or model confidence.
+def reputation_score(rep):
+    """Documented review priority, not a calibrated infection probability."""
+    if not isinstance(rep, dict) or rep.get('estado') != 'consultado' or rep.get('fonte') != 'VirusTotal API v3':
+        return None
+    hits, total = rep.get('motores_sinalizaram'), rep.get('total_motores')
+    if type(hits) is not int or type(total) is not int or not 0 <= hits <= total <= 10000 or total == 0:
+        return None
+    if hits >= 20 and hits / total >= .5:
+        return 95
+    if hits >= 10 and hits / total >= .2:
+        return 85
+    if hits >= 10:
+        return 70
+    if hits >= 3:
+        return 55
+    return 35 if hits else 0
 
-    0 without indicators; 35 for the first distinct category; +10 for each
-    additional category, capped at 85. Repetitions do not inflate the index.
-    Low 0–29, attention 30–69, high 70–100. Coverage remains a separate limit.
-    """
+
+def assess_report(report):
     evidence = report.get('evidencias') or []
     categories = sorted({str(e.get('categoria') or e.get('titulo') or 'outros') for e in evidence})
-    score = min(85, 35 + 10 * (len(categories) - 1)) if categories else 0
+    external = reputation_score(report.get('reputacao'))
+    # Do not count the same provider twice. Preserve legacy evidence if counts are invalid.
+    local_categories = [c for c in categories if c != 'reputacao_externa'] if external is not None else categories
+    local = min(85, 35 + 10 * (len(local_categories) - 1)) if local_categories else 0
+    score = max(local, external or 0)
     report['risco'] = 'alto' if score >= 70 else 'médio' if score >= 30 else 'baixo'
     report['medidor'] = {
-        'valor': score, 'versao': 'heuristica-v1', 'categorias': categories,
-        'criterio': '35 pontos pela primeira categoria de indicador e 10 por categoria adicional, até 85. Repetições não somam pontos.',
-        'limites': 'Índice de prioridade de revisão, não probabilidade de malware. Análise estática pode ter falsos positivos e negativos. Zero não garante segurança.'
+        'valor': score, 'versao': 'prioridade-v2', 'categorias': categories,
+        'pontuacao_local': local, 'pontuacao_reputacao': external,
+        'criterio': 'Maior pontuação entre análise local e reputação, sem somar as duas. Local: 35 pela primeira categoria e 10 por adicional, até 85. VirusTotal: 1–2 motores = 35; 3–9 = 55; 10 ou mais = 70; 10 ou mais e ao menos 20% = 85; 20 ou mais e ao menos 50% = 95. Zero sinalizações = 0. Contagens inválidas ou consulta indisponível não pontuam reputação. São faixas de prioridade definidas pelo GoodWare, não uma escala oficial do VirusTotal.',
+        'limites': 'Índice de prioridade de revisão, não probabilidade de malware. Motores podem discordar e não são votos independentes. Podem ocorrer falsos positivos e negativos. Zero não garante segurança; ausência de dados não equivale a resultado limpo.'
     }
     return report

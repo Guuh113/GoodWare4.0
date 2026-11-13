@@ -22,3 +22,24 @@ de resultados são exibidas como estados distintos, nunca como resultados seguro
 
 Referências: https://docs.virustotal.com/reference/url-info e
 https://docs.virustotal.com/reference/file-info
+
+## Medidor prioridade-v2
+
+Novas análises usam a maior nota entre heurística local e reputação, sem somar
+ou contar a mesma sinalização duas vezes. As faixas são uma política de triagem
+do GoodWare, não probabilidades nem uma classificação oficial do VirusTotal:
+
+| Motores sinalizando (malicious + suspicious) | Nota |
+| --- | --- |
+| 0 | 0 |
+| 1–2 | 35 |
+| 3–9 | 55 |
+| 10 ou mais | 70 |
+| 10 ou mais e pelo menos 20% dos motores válidos | 85 |
+| 20 ou mais e pelo menos 50% dos motores válidos | 95 |
+
+Vale a maior faixa aplicável. A heurística local permanece: 35 pela primeira
+categoria, +10 por categoria distinta, teto 85. Reputação indisponível/contagens
+inválidas não reduzem a nota local. Ausência de dados não indica segurança.
+O relatório mantém contagens, datas, critérios e versão. Relatórios anteriores
+preservam o cálculo original; faça nova análise para usar a versão atual.

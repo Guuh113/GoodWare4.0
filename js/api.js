@@ -54,10 +54,10 @@ window.GW = {
     const risk=scored?(value>=70?'high':value>=30?'attention':'low'):
       normalized==='alto'?'high':normalized==='medio'?'attention':normalized==='baixo'?'low':'unknown';
     const labels={high:'Alto — investigar',attention:'Atenção',low:'Baixo',unknown:'Indeterminado'};
-    const descriptions={high:'Há vários tipos de indicadores. Evite executar o arquivo até investigar.',attention:'É recomendável investigar os indicadores.',low:'Nenhum indicador relevante nas verificações realizadas. Isso não garante segurança.',unknown:'Os dados disponíveis não permitem classificar o risco.'};
+    const descriptions={high:'Há indicadores que exigem prioridade de investigação. Evite abrir ou executar o item até conferir as evidências.',attention:'É recomendável investigar os indicadores.',low:'Nenhum indicador relevante nas verificações realizadas. Isso não garante segurança.',unknown:'Os dados disponíveis não permitem classificar o risco.'};
     const outer=this.el('section',undefined,'gw-risk-panel gw-risk-'+risk);
     const top=this.el('div',undefined,'gw-risk-top');
-    top.append(this.el('strong','Medidor de risco'),this.el('span',scored?'Análise heurística':'Relatório anterior','gw-risk-badge'));
+    top.append(this.el('strong','Medidor de risco'),this.el('span',scored?(report.medidor.pontuacao_reputacao != null?'Heurística + VirusTotal':'Análise heurística'):'Relatório anterior','gw-risk-badge'));
     const row=this.el('div',undefined,'gw-risk-top');
     row.append(this.el('strong',scored?value+'/100':'Sem pontuação','gw-risk-value'));
     const status=this.el('span',undefined,'gw-risk-heading');

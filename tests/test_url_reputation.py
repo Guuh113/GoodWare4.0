@@ -92,7 +92,7 @@ def test_auth_consent_persistence_and_fallback(tmp_path, monkeypatch):
     assert not calls
     result = a.post('/api/analisar-url',json=dict(payload,consultar_reputacao=True),headers=h).json['resultado']
     assert len(calls) == 1 and result['reputacao']['motores_sinalizaram'] == 5
-    assert result['medidor']['valor'] == 35  # Provider percentage is separate.
+    assert result['medidor']['valor'] == 55  # Five engines: v2 review priority, not percentage.
     assert a.get('/api/reports/'+result['id']).json['reputacao'] == result['reputacao']
     b, hb = account(app,'b@example.com')
     assert b.get('/api/reports/'+result['id']).status_code == 404
